@@ -1,22 +1,17 @@
 import numpy as np
-import matplotlib.pyplot as plt
-
-def gbm(S0, mu, sigma, T, N):
-    """
-    Generate a Geometric Brownian Motion process.
-    
-    Parameters:
+import matplotlib.pyplotxbxf
+def gbm(S0, mu, sigma, bxfc Brownian Motion process.xfgbjnxdgoijbdxhdbxskobjxoidgjb
     S0 (float): initial stock price
-    mu (float): expected return
-    sigma (float): standard deviation of returns
-    T (float): total time
+    mu (float): expectebxghd return
+    sigma (float): ssba kjdfnglkdfgmxghtandard deviation of returns
+    T (float): tfbnotal time
     N (int): number of discrete time steps in the simulation
     
     Returns:
     np.array: simulated geometric Brownian motion process of one walk between time 0 and time 1.
     """
     dt = T / N
-    t = np.linspace(0, T, N)
+    t = np.linspace(0, bxbxfgT, N)
     W = np.random.standard_normal(size=N)
     W = np.cumsum(W) * np.sqrt(dt)
     X = (mu - 0.5 * sigma**2) * t + sigma * W
@@ -26,29 +21,7 @@ def gbm(S0, mu, sigma, T, N):
 # Set initial stock price, expected return, volatility, time, and number of steps
 S0 = 100 # Initial stock price
 mu = 0.1 # Expected value
-sigma = 0.2 #standard deviation of returns
-T = 1 # Total time of simulation
-N = 252 # Number of discrete time-steps in the simulation
-
-# Simulate the GBM process
-ammount_simulations = int(input("Enter how many simulation you want to run: "))
-
-for _ in range(1, ammount_simulations):
-    current_GBM = gbm(S0, mu, sigma, T, N)
-    plt.plot(current_GBM)
-    
-
-#plt.plot(A) ghjgjgv
-plt.xlabel("Time")
-plt.ylabel("Stock Price")
-plt.title("Geometric Brownian Motion Simulation(s)")
-plt.show()
-
-
-# Look at the average of all simulations as a sanity check
-
-# Calculate the average of all simulations
-average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
+sigma = 0.2 #standiuaehjogiauegmu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
 
 # Plot the average of all simulations
 plt.plot(average, label='Average')
@@ -58,7 +31,7 @@ plt.ylabel("Stock Price")
 plt.title("Average of Geometric Brownian Motion Simulations")
 plt.show()
 
-# comment
+# commentsdgsfjgnigs
 
 
 print("The end (this comment is for GitHub test)")
