@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def gbm(S0, mu, sigma, T, N):
     """
     Generate a Geometric Brownian Motion process.
@@ -58,7 +59,21 @@ plt.ylabel("Stock Price")
 plt.title("Average of Geometric Brownian Motion Simulations")
 plt.show()
 
-# comment
 
 
-print("The end (this comment is for GitHub test)")
+
+def BS_call_price(S, K, r, sigma, T):
+    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d2 = (np.log(S / K) + (r - 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    call_price = (S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2))
+    return call_price
+
+# Set the strike price, risk-free rate, volatility, and time to expiration
+K = 100 # Strike price
+r = 0.05 # Risk-free rate
+sigma = 0.2 # Volatility
+T = 1 # Time to expiration
+
+# Calculate the BS option price
+bs_price = BS_call_price(S0, K, r, sigma, T)
+print("BS option price: ", bs_price)
