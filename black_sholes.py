@@ -1,6 +1,8 @@
 import math
 import time
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu= 0, sigma = 1
     """
@@ -29,10 +31,10 @@ def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu=
     return cumulative
 
 
-input_int = int(input("Optional illustration of 'cumulative_probability_standard_normal_distribution'. (1 = YES, 0 = NO) : "))
+input_int = 0#int(input("Optional illustration of 'cumulative_probability_standard_normal_distribution'. (1 = YES, 0 = NO) : "))
 if(input_int):
     for i in np.arange(-3.1, 3.1, 0.1):
-        print("Probability that value is: ", round(i,0), " (or above) is: ", round(cumulative_probability_standard_normal_distribution(i), 2))
+        print("Probability that value is: ", round(i,0), " (or above) is: ", round(cumulative_prob(i), 2))
 
 def black_scholes(S0, K, r, sigma, T, option_type):
     """
@@ -68,7 +70,8 @@ r = 0.05 # risk-free interest rate
 sigma = 0.2 # volatility of underlying asset
 T = 1 # time to maturity normalized to 1 (for ex 1 year)
 option_type = "call"
-print(f"The price of the European {option_type} option is: {black_scholes(S0, K, r, sigma, T, option_type)}")
+price_call = black_scholes(S0, K, r, sigma, T, option_type)
+print(f"The price of the European {option_type} option is: {price_call}")
 
 # Example 2: Calculate the price of a European put option
 S0 = 100 # initial (current) stock price
@@ -77,6 +80,40 @@ r = 0.05 # risk-free interest rate
 sigma = 0.2 # volatility of underlying asset
 T = 1 # time to maturity normalized to 1 (for ex 1 year)
 option_type = 'put'
+price_put = black_scholes(S0, K, r, sigma, T, option_type)
+print("The price of the European {option_type} option is:", price_put)
 
-price = black_scholes(S0, K, r, sigma, T, option_type)
-print("The price of the European {option_type} option is:", price)
+
+#New input values for the graph of put and call options
+
+S0 = 50 # initial (current) stock price
+K_call = 55 # strike price for call option
+K_put = 45 # strike price for put option
+r = 0.05 # risk-free interest rate
+sigma = 0.2 # volatility of underlying asset
+
+#time values to calculate the prices
+time_values = np.arange(0.0, 20.0, 0.1)
+call_prices = []
+put_prices = []
+
+#calculating the prices for both call and put options
+for T in time_values:
+    call_price = black_scholes(S0, K_call, r, sigma, T, "call")
+    call_prices.append(call_price)
+    put_price = black_scholes(S0, K_put, r, sigma, T, "put")
+    put_prices.append(put_price)
+
+# Plotting the prices for call and put options over time to maturity
+plt.plot(time_values, call_prices, label="European call option")
+plt.plot(time_values, put_prices, label="European put option")
+plt.xlabel("Time to maturity (in years)")
+plt.ylabel("Option price")
+plt.legend()
+plt.show()
+
+# Printing the prices for put options at different time to maturity
+for t, put_price in zip(time_values, put_prices):
+    print(f"Time T (in years) = {round(t,1)} Option price at this time: {round(put_price, 1)}")
+
+
