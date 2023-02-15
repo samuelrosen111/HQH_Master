@@ -31,8 +31,29 @@ def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu=
     return cumulative
 
 
-input_int = 0#int(input("Optional illustration of 'cumulative_probability_standard_normal_distribution'. (1 = YES, 0 = NO) : "))
-if(input_int):
+def gbm(S0, mu, sigma, T, N):
+    """
+    Generate a Geometric Brownian Motion process.
+    
+    Parameters:
+    S0 (float): initial stock price
+    mu (float): expected return
+    sigma (float): standard deviation of returns
+    T (float): total time
+    N (int): number of discrete time steps in the simulation
+    
+    Returns:
+    np.array: simulated geometric Brownian motion process of one walk between time 0 and time 1.
+    """
+    dt = T / N
+    t = np.linspace(0, T, N)
+    W = np.random.standard_normal(size=N)
+    W = np.cumsum(W) * np.sqrt(dt)
+    X = (mu - 0.5 * sigma**2) * t + sigma * W
+    S = S0 * np.exp(X)
+    return S
+
+if(0):
     for i in np.arange(-3.1, 3.1, 0.1):
         print("Probability that value is: ", round(i,0), " (or above) is: ", round(cumulative_prob(i), 2))
 
@@ -88,32 +109,92 @@ print("The price of the European {option_type} option is:", price_put)
 
 S0 = 50 # initial (current) stock price
 K_call = 55 # strike price for call option
-K_put = 45 # strike price for put option
+K_put = 30 # strike price for put option
 r = 0.05 # risk-free interest rate
 sigma = 0.2 # volatility of underlying asset
 
 #time values to calculate the prices
-time_values = np.arange(0.0, 20.0, 0.1)
+time_values = np.arange(0.0, 10, 0.1)
 call_prices = []
 put_prices = []
 
 #calculating the prices for both call and put options
 for T in time_values:
-    call_price = black_scholes(S0, K_call, r, sigma, T, "call")
+    call_price = -black_scholes(S0, K_call, r, sigma, T, "call")
     call_prices.append(call_price)
-    put_price = black_scholes(S0, K_put, r, sigma, T, "put")
+    put_price = -black_scholes(S0, K_put, r, sigma, T, "put")
     put_prices.append(put_price)
 
 # Plotting the prices for call and put options over time to maturity
+""""
 plt.plot(time_values, call_prices, label="European call option")
 plt.plot(time_values, put_prices, label="European put option")
 plt.xlabel("Time to maturity (in years)")
 plt.ylabel("Option price")
 plt.legend()
 plt.show()
+"""
 
 # Printing the prices for put options at different time to maturity
-for t, put_price in zip(time_values, put_prices):
-    print(f"Time T (in years) = {round(t,1)} Option price at this time: {round(put_price, 1)}")
+if(0):
+    for t, put_price in zip(time_values, put_prices):
+        print(f"Time T (in years) = {round(t,1)} Put price at this time: {round(put_price, 1)}")
 
 
+def simulate_options(S0, K_call, K_put, r, sigma, T, N, num_simulations):
+    """
+    Simulate European call and put option prices using a geometric brownian motion process.
+    
+    Parameters:
+    S0 (float): initial stock price
+    K_call (float): strike price for call option
+    K_put (float): strike price for put option
+    r (float): risk-free interest rate
+    sigma (float): standard deviation of returns
+    T (float): total time
+    N (int): number of discrete time steps in the simulation
+    num_simulations (int): number of simulation walks to average over
+    
+    Returns:
+    tuple: mean call option price and mean put option price, both over num_simulations walks
+    """
+    T = float(T)
+    dt = T / N
+    call_prices = np.zeros(num_simulations)
+    put_prices = np.zeros(num_simulations)
+    
+    for i in range(num_simulations):
+        S = gbm(S0, r, sigma, T, N)
+        for j, t in enumerate(np.linspace(0, T, N)):
+            call_price = black_scholes(S[j], K_call, r, sigma, T - t, "call")
+            call_prices[i] += call_price * np.exp(-r * (T - t - j * dt)) * dt
+            put_price = black_scholes(S[j], K_put, r, sigma, T - t, "put")
+            put_prices[i] += put_price * np.exp(-r * (T - t - j * dt)) * dt
+            
+    mean_call_price = call_prices.mean()
+    mean_put_price = put_prices.mean()
+    
+    return mean_call_price, mean_put_price
+
+# Example input values
+S0 = 50
+K_call = 55
+K_put = 45
+r = 0.05
+sigma = 0.2
+T = 1
+option_type = "call"
+N = 1000
+num_simulations = 1000
+
+# Call the simulate_options function with the example input values
+option_prices = simulate_options(S0, K_call, K_put, r, sigma, T, N, num_simulations)
+
+
+
+# Plot a histogram of the simulated option prices
+plt.hist(option_prices, bins=50, edgecolor='black')
+plt.xlabel("Option price")
+plt.ylabel("Frequency")
+plt.title(f"Histogram of simulated {option_type} option prices")
+plt.show()
