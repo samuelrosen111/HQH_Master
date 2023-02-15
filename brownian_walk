@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+import time
 
 def gbm(S0, mu, sigma, T, N):
     """
@@ -46,19 +46,29 @@ plt.title("Geometric Brownian Motion Simulation(s)")
 plt.show()
 
 
-# Look at the average of all simulations as a sanity check
-
 # Calculate the average of all simulations
 average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
-
 # Plot the average of all simulations
 plt.plot(average, label='Average')
 plt.legend()
 plt.xlabel("Time")
 plt.ylabel("Stock Price")
-plt.title("Average of Geometric Brownian Motion Simulations")
+plt.title("Average of Geometric Brownian Motion Simulations. (For the ammount of simulations you chose.)")
 plt.show()
 
+simulation_numbers = [5, 10, 50, 100, 500, 1000]
+for ammount_simulations in simulation_numbers:
+    # Calculate the average of all simulations
+    average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
+    
+    # Plot the average of all simulations
+    plt.plot(average, label=f'Average of {ammount_simulations} simulations.')
+    plt.legend()
+    plt.xlabel("Time")
+    plt.ylabel("Stock Price")
+    plt.title("Average of Geometric Brownian Motion Simulations, close this window for next one.")
+    plt.show()
+    #time.sleep(1)
 
 
 
