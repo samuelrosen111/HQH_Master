@@ -24,52 +24,77 @@ def gbm(S0, mu, sigma, T, N):
     S = S0 * np.exp(X)
     return S
 
-# Set initial stock price, expected return, volatility, time, and number of steps
-S0 = 100 # Initial stock price
-mu = 0.1 # Expected value
-sigma = 0.2 #standard deviation of returns
-T = 1 # Total time of simulation
-N = 252 # Number of discrete time-steps in the simulation
+def illustrate_gbm():
+    # Set initial stock price, expected return, volatility, time, and number of steps
+    S0 = 100 # Initial stock price
+    mu = 0.1 # Expected value
+    sigma = 0.2 #standard deviation of returns
+    T = 1 # Total time of simulation
+    N = 252 # Number of discrete time-steps in the simulation
 
-# Simulate the GBM process
-ammount_simulations = int(input("Enter how many simulation you want to run: "))
+    print(f"Illustration of GBM with parameters: \nInitial stock price: {S0} \nExpected return: {mu} \nVolatility: {sigma} \nTotal time: {T} \nDiscrete time steps: {N}")
 
-for _ in range(1, ammount_simulations):
-    current_GBM = gbm(S0, mu, sigma, T, N)
-    plt.plot(current_GBM)
-    
+    # Simulate the GBM process
+    ammount_simulations = int(input("Enter how many simulation you want to run: "))
 
-#plt.plot(A) ghjgjgv
-plt.xlabel("Time")
-plt.ylabel("Stock Price")
-plt.title("Geometric Brownian Motion Simulation(s)")
-plt.show()
+    for _ in range(1, ammount_simulations):
+        current_GBM = gbm(S0, mu, sigma, T, N)
+        plt.plot(current_GBM)
 
-
-# Calculate the average of all simulations
-average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
-# Plot the average of all simulations
-plt.plot(average, label='Average')
-plt.legend()
-plt.xlabel("Time")
-plt.ylabel("Stock Price")
-plt.title("Average of Geometric Brownian Motion Simulations. (For the ammount of simulations you chose.)")
-plt.show()
-
-simulation_numbers = [5, 10, 50, 100, 500, 1000]
-for ammount_simulations in simulation_numbers:
+    #plt.plot(A) ghjgjgv
+    plt.xlabel("Time")
+    plt.ylabel("Stock Price")
+    plt.title("Geometric Brownian Motion Simulation(s)")
+    plt.show()
     # Calculate the average of all simulations
     average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
-    
     # Plot the average of all simulations
-    plt.plot(average, label=f'Average of {ammount_simulations} simulations.')
+    plt.plot(average, label='Average')
     plt.legend()
     plt.xlabel("Time")
     plt.ylabel("Stock Price")
-    plt.title("Average of Geometric Brownian Motion Simulations, close this window for next one.")
+    plt.title("Average of the Geometric Brownian Motion Simulations.")
     plt.show()
-    #time.sleep(1)
+    simulation_numbers = [5, 10, 50, 100, 500, 1000]
+    for ammount_simulations in simulation_numbers:
+        # Calculate the average of all simulations
+        average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
+        
+        # Plot the average of all simulations
+        plt.plot(average, label=f'Average of {ammount_simulations} simulations.')
+        plt.legend()
+        plt.xlabel("Time")
+        plt.ylabel("Stock Price")
+        plt.title("Average of Geometric Brownian Motion Simulations")
+        plt.show()
 
+    # Illustrate the effect of changing expected return
+
+    mu_values = [0.05, 0.4, 0.8, 1]
+    for mu in mu_values:
+        average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
+        plt.plot(average, label=f'Expected return: {mu}')
+        plt.legend()
+        plt.xlabel("Time")
+        plt.ylabel("Stock Price")
+        plt.title("Effect of Changing Expected Return (mu)")
+    print(f"\n \n Illustration of GBM (changing mu) with parameters: \nInitial stock price: {S0} \nExpected return: {mu} \nVolatility: {sigma} \nTotal time: {T} \nDiscrete time steps: {N}")
+    plt.show()
+
+    # Illustrate the effect of changing volatility
+    sigma_values = [0, 2, 4, 8]
+    for sigma in sigma_values:
+        average = np.mean(np.array([gbm(S0, mu, sigma, T, N) for _ in range(ammount_simulations)]), axis=0)
+        plt.plot(average, label=f'Volatility: {sigma}')
+        plt.legend()
+        plt.xlabel("Time")
+        plt.ylabel("Stock Price")
+        plt.title("Effect of Changing Volatility (sigma)")
+    print(f"\n \n Illustration of GBM (changing sigma) with parameters: \nInitial stock price: {S0} \nExpected return: {mu} \nVolatility: {sigma} \nTotal time: {T} \nDiscrete time steps: {N}")
+    plt.show()
+
+
+illustrate_gbm()
 
 
 def BS_call_price(S, K, r, sigma, T):
@@ -86,4 +111,5 @@ T = 1 # Time to expiration
 
 # Calculate the BS option price
 bs_price = BS_call_price(S0, K, r, sigma, T)
-print("BS option price: ", bs_price)
+print("BS call-option price: ", bs_price)
+
