@@ -37,7 +37,7 @@ def illustrate_gbm():
     # Simulate the GBM process
     ammount_simulations = int(input("Enter how many simulation you want to run: "))
 
-    for _ in range(1, ammount_simulations):
+    for _ in range(1, ammount_simulations+1):
         current_GBM = gbm(S0, mu, sigma, T, N)
         plt.plot(current_GBM)
 
@@ -91,25 +91,39 @@ def illustrate_gbm():
         plt.ylabel("Stock Price")
         plt.title("Effect of Changing Volatility (sigma)")
     print(f"\n \n Illustration of GBM (changing sigma) with parameters: \nInitial stock price: {S0} \nExpected return: {mu} \nVolatility: {sigma} \nTotal time: {T} \nDiscrete time steps: {N}")
+    print("Higher volatility = lower expected value over time. Somewhere around 3 things get out of hand.")
     plt.show()
 
+def illustrate_cumulative_prob():
+    x = np.linspace(-3, 3, 1000)
+    y_cumulative = []
+    y_normal = []
+    for i in x:
+        y_cumulative.append(float(1-cumulative_prob(i)))
+        y_normal.append(float((1 / (math.sqrt(2 * math.pi))) * math.exp(-0.5 * i * i)))
+    fig, ax1 = plt.subplots()
+    ax1.plot(x, y_cumulative, color='red')
+    ax1.set_xlabel('X Value')
+    ax1.set_ylabel('Cumulative Probability', color='red')
+    ax1.tick_params(axis='y', labelcolor='red')
+    
+    ax2 = ax1.twinx()
+    ax2.plot(x, y_normal, color='blue')
+    ax2.set_ylabel('Normal Distribution', color='blue')
+    ax2.tick_params(axis='y', labelcolor='blue')
+    
+    plt.title("Cumulative Probability and Normal Distribution")
+    plt.show()
 
-illustrate_gbm()
+def illustrate_GBM_cumulativeProb():
+    print("What would you like to test?")
+    print("1. Cumulative Probability of Normal Distribution")
+    print("2. Geometric Brownian Motion example runs")
 
-
-def BS_call_price(S, K, r, sigma, T):
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
-    d2 = (np.log(S / K) + (r - 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
-    call_price = (S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2))
-    return call_price
-
-# Set the strike price, risk-free rate, volatility, and time to expiration
-K = 100 # Strike price
-r = 0.05 # Risk-free rate
-sigma = 0.2 # Volatility
-T = 1 # Time to expiration
-
-# Calculate the BS option price
-bs_price = BS_call_price(S0, K, r, sigma, T)
-print("BS call-option price: ", bs_price)
-
+    test = int(input("Enter the number of the test you would like to run: "))
+    if test == 1:
+        illustrate_cumulative_prob()
+    elif test == 2:
+        illustrate_gbm()
+    else:
+        print("")
