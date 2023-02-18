@@ -127,3 +127,6 @@ def illustrate_GBM_cumulativeProb():
         illustrate_gbm()
     else:
         print("")
+
+
+illustrate_gbm()

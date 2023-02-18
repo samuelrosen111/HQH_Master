@@ -4,6 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+
+# Functions being used:
+
+
+
 def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu= 0, sigma = 1
     """
     Computes the cumulative standard normal distribution
@@ -28,7 +33,7 @@ def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu=
     if x < 0:
         cumulative = 1.0 - cumulative
         
-    return cumulative
+    return 1-cumulative
 
 def gbm(S0, mu, sigma, T, N):
     """
@@ -51,6 +56,60 @@ def gbm(S0, mu, sigma, T, N):
     X = (mu - 0.5 * sigma**2) * t + sigma * W
     S = S0 * np.exp(X)
     return S
+
+def black_scholes(S0, K, r, sigma, T, option_type):
+    """
+    Calculates the price of a European call or put option using the Black-Scholes formula
+    
+    Parameters:
+    S0 (float): the current stock price
+    K (float): the strike price
+    r (float): the risk-free interest rate
+    sigma (float): the volatility of the underlying asset
+    T (float): the time to maturity in years
+    option_type (str): either "call" or "put" to specify the type of option
+    
+    Returns:
+    float: the price of the European call or put option
+    """
+    d1 = (math.log(S0 / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+    
+    if option_type == "call":
+        value = S0 * cumulative_prob(d1) - K * math.exp(-r * T) * cumulative_prob(d2)
+    elif option_type == "put":
+        value = K * math.exp(-r * T) * cumulative_prob(-d2) - S0 * cumulative_prob(-d1)
+    else:
+        raise ValueError("Invalid option type, must be 'call' or 'put'")
+        
+    return value
+
+
+
+#Functions to demostarte the code and run examples:
+
+
+
+def illustrate_cumulative_prob():
+    x = np.linspace(-3, 3, 1000)
+    y_cumulative = []
+    y_normal = []
+    for i in x:
+        y_cumulative.append(float(1-cumulative_prob(i)))
+        y_normal.append(float((1 / (math.sqrt(2 * math.pi))) * math.exp(-0.5 * i * i)))
+    fig, ax1 = plt.subplots()
+    ax1.plot(x, y_cumulative, color='red')
+    ax1.set_xlabel('X Value')
+    ax1.set_ylabel('Cumulative Probability', color='red')
+    ax1.tick_params(axis='y', labelcolor='red')
+    
+    ax2 = ax1.twinx()
+    ax2.plot(x, y_normal, color='blue')
+    ax2.set_ylabel('Normal Distribution', color='blue')
+    ax2.tick_params(axis='y', labelcolor='blue')
+    
+    plt.title("Cumulative Probability and Normal Distribution")
+    plt.show()
 
 def illustrate_gbm():
     # Set initial stock price, expected return, volatility, time, and number of steps
@@ -122,54 +181,6 @@ def illustrate_gbm():
     print("Higher volatility = lower expected value over time. Somewhere around 3 things get out of hand.")
     plt.show()
 
-def illustrate_cumulative_prob():
-    x = np.linspace(-3, 3, 1000)
-    y_cumulative = []
-    y_normal = []
-    for i in x:
-        y_cumulative.append(float(1-cumulative_prob(i)))
-        y_normal.append(float((1 / (math.sqrt(2 * math.pi))) * math.exp(-0.5 * i * i)))
-    fig, ax1 = plt.subplots()
-    ax1.plot(x, y_cumulative, color='red')
-    ax1.set_xlabel('X Value')
-    ax1.set_ylabel('Cumulative Probability', color='red')
-    ax1.tick_params(axis='y', labelcolor='red')
-    
-    ax2 = ax1.twinx()
-    ax2.plot(x, y_normal, color='blue')
-    ax2.set_ylabel('Normal Distribution', color='blue')
-    ax2.tick_params(axis='y', labelcolor='blue')
-    
-    plt.title("Cumulative Probability and Normal Distribution")
-    plt.show()
-
-def black_scholes(S0, K, r, sigma, T, option_type):
-    """
-    Calculates the price of a European call or put option using the Black-Scholes formula
-    
-    Parameters:
-    S0 (float): the current stock price
-    K (float): the strike price
-    r (float): the risk-free interest rate
-    sigma (float): the volatility of the underlying asset
-    T (float): the time to maturity in years
-    option_type (str): either "call" or "put" to specify the type of option
-    
-    Returns:
-    float: the price of the European call or put option
-    """
-    d1 = (math.log(S0 / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
-    d2 = d1 - sigma * math.sqrt(T)
-    
-    if option_type == "call":
-        value = S0 * cumulative_prob(d1) - K * math.exp(-r * T) * cumulative_prob(d2)
-    elif option_type == "put":
-        value = K * math.exp(-r * T) * cumulative_prob(-d2) - S0 * cumulative_prob(-d1)
-    else:
-        raise ValueError("Invalid option type, must be 'call' or 'put'")
-        
-    return value
-
 def illustrate_black_scholes():
     # Example 1
     S0 = 100 # initial (current) stock price
@@ -192,7 +203,7 @@ def illustrate_black_scholes():
     price_put = black_scholes(S0, K, r, sigma, T, option_type)
     print(f"The price of the European {option_type} option is:", price_put)
 
-    time.sleep(10)
+    time.sleep(2)
 
     #New input values for the graph of put and call options
 
@@ -222,48 +233,68 @@ def illustrate_black_scholes():
     plt.show()
 
     # Printing the prices for put options at different time to maturity
-    if(1):
-        for t, put_price in zip(time_values, put_prices):
-            print(f"Time T (in years) = {round(t,1)} Put price at this time: {round(put_price, 1)}")
+    
+    for t, put_price in zip(time_values, put_prices):
+        print(f"Time T (in years) = {round(t,1)} Put price at this time: {round(put_price, 1)}")
 
-illustrate_black_scholes()
+def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_points=100):
+    K_list = np.linspace(80, 120, num_points)
+    call_values = np.zeros(num_points)
+    put_values = np.zeros(num_points)
+    
+    for i, K in enumerate(K_list):
+        call_values[i] = black_scholes(S0, K, r, sigma, T, 'call')
+        put_values[i] = black_scholes(S0, K, r, sigma, T, 'put')
+    
+    # Print the parameter values
+    print("\n--> Plot showing Call and Put prices for different strike prices, given:")
+    print("S0 (current stock price) = ", S0)
+    print("K (strike price) = ", K)
+    print("r (risk-free interest rate) = ", r)
+    print("sigma (volatility of the underlying asset) = ", sigma)
+    print("T (time to maturity in years) = ", T)
 
-def main():
-    print("Enter what you want to do:")
-    print("1. Illustrate Cumulative Probability of Normal Distribution")
-    print("2. Illustrate Geometric Brownian Motion example runs")
-    print("3 Illustrate Black Scholes")
-    print("Any other number to skip")
+    plt.plot(K_list, call_values, 'b', label='Call option')
+    plt.plot(K_list, put_values, 'r', label='Put option')
+    plt.legend()
+    plt.xlabel('Strike price (K)')
+    plt.ylabel('Option value')
+    plt.title('Black-Scholes option values for a range of strike prices')
+    plt.show()
 
-    test = int(input("Enter the number of the test you would like to run: "))
-    if test == 1:
-        illustrate_cumulative_prob()
-    elif test == 2:
-        illustrate_gbm()
-    elif test == 3:
-        illustrate_black_scholes()
-    else:
-        print("")
+    #plots sigma also
 
-    print("The end.")
+    sigma_list = [0.1, 0.2, 0.3, 0.4, 0.5]
+    put_values_sigma = np.zeros((len(sigma_list), num_points))
 
-def simulate_options(S0, K_call, K_put, r, sigma, T, N, num_simulations):
+    for j, sigma_val in enumerate(sigma_list):
+        for i, K in enumerate(K_list):
+            put_values_sigma[j, i] = black_scholes(S0, K, r, sigma_val, T, 'put')
+
+        plt.plot(K_list, put_values_sigma[j, :], label=f'Put option, sigma={sigma_val}')
+
+    plt.legend()
+    plt.xlabel('Strike price (K)')
+    plt.ylabel('Option value')
+    plt.title('Black-Scholes put option values for a range of strike prices and volatility')
+    plt.show()
+
+def simulate_option_prices():
     """
     Simulate European call and put option prices using a geometric brownian motion process.
-    
-    Parameters:
-    S0 (float): initial stock price
-    K_call (float): strike price for call option
-    K_put (float): strike price for put option
-    r (float): risk-free interest rate
-    sigma (float): standard deviation of returns
-    T (float): total time
-    N (int): number of discrete time steps in the simulation
-    num_simulations (int): number of simulation walks to average over
     
     Returns:
     tuple: mean call option price and mean put option price, both over num_simulations walks
     """
+    S0 = 100.0
+    K_call = 110.0
+    K_put = 90.0
+    r = 0.05
+    sigma = 0.2
+    T = 1.0
+    N = 100
+    num_simulations = 1000
+    
     T = float(T)
     dt = T / N
     call_prices = np.zeros(num_simulations)
@@ -280,35 +311,62 @@ def simulate_options(S0, K_call, K_put, r, sigma, T, N, num_simulations):
     mean_call_price = call_prices.mean()
     mean_put_price = put_prices.mean()
     
-    return mean_call_price, mean_put_price
+
+    print("Simulating European call and put options prices using geometric brownian motion process...")
+    print("Assumptions:")
+    print("\t- The underlying asset price follows a geometric brownian motion process")
+    print("\t- The options are European options")
+    print("\t- The risk-free interest rate is constant")
+    print("\t- The volatility of the underlying asset is constant")
+    print("\t- The simulation is run over %d time steps with a time step size of %f" % (N, dt))
+    print("Variable values:")
+    print("\t- Initial stock price (S0):", S0)
+    print("\t- Strike price for call option (K_call):", K_call)
+    print("\t- Strike price for put option (K_put):", K_put)
+    print("\t- Risk-free interest rate (r):", r)
+    print("\t- Standard deviation of returns (sigma):", sigma)
+    print("\t- Total time (T):", T)
+    print("\t- Number of simulation walks (num_simulations):", num_simulations)
+    print("Results:")
+
+    print("Mean call option price:", mean_call_price)
+    print("Mean put option price:", mean_put_price)
+    
+    #return mean_call_price, mean_put_price
 
 
 
-#main()
+
+# Main function to let the use navigate the code
 
 
 
+def main():
+    # This function asks the user to pick which part of the code they want to run. 
+    # Each illustrate funciton calls on a function of intetest and displays graphically how it works.
+    print("Enter what you want to do:")
+    print("1: Illustrate Cumulative Probability of Normal Distribution")
+    print("2: Illustrate Geometric Brownian Motion example runs")
+    print("3: Illustrate Black Scholes")
+    print("4: More plotting of Black Scholes")
+    print("4: simulate_option_prices")
 
-"""""
-# Example input values
-S0 = 50
-K_call = 55
-K_put = 45
-r = 0.05
-sigma = 0.2
-T = 1
-option_type = "call"
-N = 1000
-num_simulations = 1000
+    test = int(input("Enter the number of the test you would like to run: "))
+    if test == 1:
+        illustrate_cumulative_prob()
+    elif test == 2:
+        illustrate_gbm()
+    elif test == 3:
+        illustrate_black_scholes()
+    elif test == 4:
+        plot_black_scholes()
+    elif test == 5:
+        simulate_option_prices()
+    else:
+        print("")
 
-# Call the simulate_options function with the example input values
-option_prices = simulate_options(S0, K_call, K_put, r, sigma, T, N, num_simulations)
+    print("The end.")
 
 
-# Plot a histogram of the simulated option prices
-plt.hist(option_prices, bins=50, edgecolor='black')
-plt.xlabel("Option price")
-plt.ylabel("Frequency")
-plt.title(f"Histogram of simulated {option_type} option prices")
-plt.show()
-"""
+
+main()
