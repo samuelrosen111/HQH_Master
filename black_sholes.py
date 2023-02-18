@@ -181,7 +181,7 @@ def illustrate_gbm():
     print("Higher volatility = lower expected value over time. Somewhere around 3 things get out of hand.")
     plt.show()
 
-def illustrate_black_scholes():
+def example_run_black_scholes():
     # Example 1
     S0 = 100 # initial (current) stock price
     K = 95 # strike price
@@ -191,7 +191,7 @@ def illustrate_black_scholes():
     option_type = "call"
     price_call = black_scholes(S0, K, r, sigma, T, option_type)
     print(f"\nExample 1, for the given values: \nS0 = {S0} \nK = {K} \nr = {r} \nsigma = {sigma} \nT = {T}")
-    print(f"\nThe price of the European {option_type} option is: {price_call}")
+    print(f"The price of the European {option_type} option is: {price_call}")
 
     # Example 2: Calculate the price of a European put option
     S0 = 100 # initial (current) stock price
@@ -201,41 +201,26 @@ def illustrate_black_scholes():
     T = 1 # time to maturity normalized to 1 (for ex 1 year)
     option_type = 'put'
     price_put = black_scholes(S0, K, r, sigma, T, option_type)
-    print(f"The price of the European {option_type} option is:", price_put)
+    print(f"\nExample 2, for the given values: \nS0 = {S0} \nK = {K} \nr = {r} \nsigma = {sigma} \nT = {T}")
+    print(f"The price of the European {option_type} option is: {price_put}")
 
-    time.sleep(2)
+    coco = 1
+    while(coco==1):
+        # User input for custom values
+        S0 = float(input("Enter the current stock price (S0): "))
+        K = float(input("Enter the strike price (K): "))
+        r = float(input("Enter the risk-free interest rate (r): "))
+        sigma = float(input("Enter the volatility of the underlying asset (sigma): "))
+        T = float(input("Enter the time to maturity (T): "))
+        option_type = input("Enter the option type ('call' or 'put'): ").lower()
 
-    #New input values for the graph of put and call options
+        # Calculate option price based on user input
+        price = black_scholes(S0, K, r, sigma, T, option_type)
 
-    S0 = 50 # initial (current) stock price
-    K_call = 55 # strike price for call option
-    K_put = 30 # strike price for put option
-    r = 0.05 # risk-free interest rate
-    sigma = 0.2 # volatility of underlying asset
-
-    #time values to calculate the prices
-    time_values = np.arange(0.0, 10, 0.1)
-    call_prices = []
-    put_prices = []
-
-    #calculating the prices for both call and put options
-    for T in time_values:
-        call_price = -black_scholes(S0, K_call, r, sigma, T, "call")
-        call_prices.append(call_price)
-        put_price = -black_scholes(S0, K_put, r, sigma, T, "put")
-        put_prices.append(put_price)
-
-    plt.plot(time_values, call_prices, label="European call option")
-    plt.plot(time_values, put_prices, label="European put option")
-    plt.xlabel("Time to maturity (in years)")
-    plt.ylabel("Option price")
-    plt.legend()
-    plt.show()
-
-    # Printing the prices for put options at different time to maturity
-    
-    for t, put_price in zip(time_values, put_prices):
-        print(f"Time T (in years) = {round(t,1)} Put price at this time: {round(put_price, 1)}")
+        # Print the option price
+        print(f"\nFor the given values: \nS0 = {S0} \nK = {K} \nr = {r} \nsigma = {sigma} \nT = {T}")
+        print(f"The price of the European {option_type} option is: {price}")
+        coco = int(input("For another example enter 1 to quit enter 0: "))
 
 def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_points=100):
     K_list = np.linspace(80, 120, num_points)
@@ -272,6 +257,8 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
             put_values_sigma[j, i] = black_scholes(S0, K, r, sigma_val, T, 'put')
 
         plt.plot(K_list, put_values_sigma[j, :], label=f'Put option, sigma={sigma_val}')
+    
+    print("\n\n... For the same given values, here is a plot of sigma values vs price --> ")
 
     plt.legend()
     plt.xlabel('Strike price (K)')
@@ -279,66 +266,7 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
     plt.title('Black-Scholes put option values for a range of strike prices and volatility')
     plt.show()
 
-def simulate_option_prices():
-    """
-    Simulate European call and put option prices using a geometric brownian motion process.
-    
-    Returns:
-    tuple: mean call option price and mean put option price, both over num_simulations walks
-    """
-    S0 = 100.0
-    K_call = 110.0
-    K_put = 90.0
-    r = 0.05
-    sigma = 0.2
-    T = 1.0
-    N = 100
-    num_simulations = 1000
-    
-    T = float(T)
-    dt = T / N
-    call_prices = np.zeros(num_simulations)
-    put_prices = np.zeros(num_simulations)
-    
-    for i in range(num_simulations):
-        S = gbm(S0, r, sigma, T, N)
-        for j, t in enumerate(np.linspace(0, T, N)):
-            call_price = black_scholes(S[j], K_call, r, sigma, T - t, "call")
-            call_prices[i] += call_price * np.exp(-r * (T - t - j * dt)) * dt
-            put_price = black_scholes(S[j], K_put, r, sigma, T - t, "put")
-            put_prices[i] += put_price * np.exp(-r * (T - t - j * dt)) * dt
-            
-    mean_call_price = call_prices.mean()
-    mean_put_price = put_prices.mean()
-    
-
-    print("Simulating European call and put options prices using geometric brownian motion process...")
-    print("Assumptions:")
-    print("\t- The underlying asset price follows a geometric brownian motion process")
-    print("\t- The options are European options")
-    print("\t- The risk-free interest rate is constant")
-    print("\t- The volatility of the underlying asset is constant")
-    print("\t- The simulation is run over %d time steps with a time step size of %f" % (N, dt))
-    print("Variable values:")
-    print("\t- Initial stock price (S0):", S0)
-    print("\t- Strike price for call option (K_call):", K_call)
-    print("\t- Strike price for put option (K_put):", K_put)
-    print("\t- Risk-free interest rate (r):", r)
-    print("\t- Standard deviation of returns (sigma):", sigma)
-    print("\t- Total time (T):", T)
-    print("\t- Number of simulation walks (num_simulations):", num_simulations)
-    print("Results:")
-
-    print("Mean call option price:", mean_call_price)
-    print("Mean put option price:", mean_put_price)
-    
-    #return mean_call_price, mean_put_price
-
-
-
-
 # Main function to let the use navigate the code
-
 
 
 def main():
@@ -347,9 +275,8 @@ def main():
     print("Enter what you want to do:")
     print("1: Illustrate Cumulative Probability of Normal Distribution")
     print("2: Illustrate Geometric Brownian Motion example runs")
-    print("3: Illustrate Black Scholes")
-    print("4: More plotting of Black Scholes")
-    print("4: simulate_option_prices")
+    print("3: Example runs - Black Scholes")
+    print("4: Plotting of Black Scholes")
 
     test = int(input("Enter the number of the test you would like to run: "))
     if test == 1:
@@ -357,16 +284,12 @@ def main():
     elif test == 2:
         illustrate_gbm()
     elif test == 3:
-        illustrate_black_scholes()
+        example_run_black_scholes()
     elif test == 4:
         plot_black_scholes()
-    elif test == 5:
-        simulate_option_prices()
     else:
         print("")
 
-    print("The end.")
-
-
+    print("\n\n The end of the main program.")
 
 main()
