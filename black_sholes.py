@@ -1,12 +1,12 @@
 import math
 import time
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 
 
 
 # Functions being used:
-
 
 
 def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu= 0, sigma = 1
@@ -84,10 +84,80 @@ def black_scholes(S0, K, r, sigma, T, option_type):
         
     return value
 
+def black_scholes_monte_carlo(S0, K, T, r, sigma, num_sims, option_type):
+    """
+    Computes the price of an European option using the Black-Scholes model and Monte Carlo simulation.
+    
+    Args:
+    S0: current stock price
+    K: strike price
+    T: time to maturity in years
+    r: risk-free interest rate
+    sigma: volatility of the stock
+    num_sims: number of simulations to perform
+    option_type: type of option, either 'call' or 'put'
+    
+    Returns:
+    The estimated price of the European option
+    """
+    dt = T/num_sims
+
+    random_number = np.random.standard_normal(num_sims) # draws random numbers from a standard normal distribution
+    S_T = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * random_number) # simulates the future stock price at time T
+    
+    if option_type == 'call':
+        option_price = np.exp(-r * T) * np.maximum(S_T - K, 0).mean()
+    elif option_type == 'put':
+        option_price = np.exp(-r * T) * np.maximum(K - S_T, 0).mean()
+    else:
+        print("Error: option type must be either 'call' or 'put'")
+        return None
+    
+    return option_price
+
+def plot_error_vs_num_sims():
+    """
+    Plots the average error between the Black-Scholes model and Monte Carlo simulation as a function of the number of simulations.
+    
+    Args:
+    n: number of times to repeat the calculation
+    
+    Returns:
+    Plot of the average error between the Black-Scholes model and Monte Carlo simulation as a function of the number of simulations
+    """
+    S0 = 100
+    K = 110
+    T = 1
+    r = 0.05
+    sigma = 0.2
+    num_sims_list = [10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 10000000]
+    option_type = 'call'
+    n = 20 # Number of iterations - for smoothing away random error
+    
+    bs_price = black_scholes(S0, K, T, r, sigma, option_type)
+    total_errors = []
+    for i in range(n):
+        mc_prices = [black_scholes_monte_carlo(S0, K, T, r, sigma, num_sims, option_type) for num_sims in num_sims_list]
+        errors = [np.abs(bs_price - mc_price) for mc_price in mc_prices]
+        total_errors.append(errors)
+    
+    avg_errors = np.mean(total_errors, axis=0)
+    for i, (num_sims, error) in enumerate(zip(num_sims_list, avg_errors)):
+        print(f"For {num_sims} simulations, the average absolute error is {error}")
+
+    plt.plot(num_sims_list, avg_errors, '-o', color='green')
+    plt.xscale('log')
+    plt.xlabel('Number of simulations')
+    plt.ylabel('Average absolute error')
+    plt.title('Average absolute error between Black-Scholes and Monte Carlo simulation')
+    plt.show()
+
+plot_error_vs_num_sims()
+
+plot_error_vs_num_sims()
 
 
 #Functions to demostarte the code and run examples:
-
 
 
 def illustrate_cumulative_prob():
@@ -238,6 +308,13 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
     print("r (risk-free interest rate) = ", r)
     print("sigma (volatility of the underlying asset) = ", sigma)
     print("T (time to maturity in years) = ", T)
+  
+    print("Values of prices: ")
+    print("Strike price:  Call Value:  Put Value: ")
+    for i in range (1,100):
+        print("{:<14} {:<12} {:<12}".format(round(K_list[i], 2), round(call_values[i], 2), round(put_values[i], 2)))
+        time.sleep(0.1)
+
 
     plt.plot(K_list, call_values, 'b', label='Call option')
     plt.plot(K_list, put_values, 'r', label='Put option')
@@ -247,7 +324,7 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
     plt.title('Black-Scholes option values for a range of strike prices')
     plt.show()
 
-    #plots sigma also
+    # Plot Black-Scholes values for different sigmas
 
     sigma_list = [0.1, 0.2, 0.3, 0.4, 0.5]
     put_values_sigma = np.zeros((len(sigma_list), num_points))
@@ -267,8 +344,7 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
     plt.show()
 
 # Main function to let the use navigate the code
-
-
+    
 def main():
     # This function asks the user to pick which part of the code they want to run. 
     # Each illustrate funciton calls on a function of intetest and displays graphically how it works.
@@ -292,4 +368,4 @@ def main():
 
     print("\n\n The end of the main program.")
 
-main()
+#main()
