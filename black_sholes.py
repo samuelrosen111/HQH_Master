@@ -242,7 +242,7 @@ def plot_option_error_vs_simulations(S0=100, K=110, r=0.05, sigma=0.2, T=1, opti
     print("Standard deviation of Monte Carlo option prices: ", mc_std)
 
 
-plot_option_error_vs_timestep()
+plot_option_error_vs_simulations()
 
 
 
