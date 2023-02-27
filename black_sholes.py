@@ -4,10 +4,7 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 
-
-
-# Functions being used:
-
+######################################################################## 💹 Basic Functions 💹 
 
 def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu= 0, sigma = 1
     """
@@ -57,6 +54,9 @@ def gbm(S0, mu, sigma, T, N):
     S = S0 * np.exp(X)
     return S
 
+
+######################################################################## 💹 Black Scholes 💹 
+
 def black_scholes(S0, K, r, sigma, T, option_type):
     """
     Calculates the price of a European call or put option using the Black-Scholes formula
@@ -83,83 +83,8 @@ def black_scholes(S0, K, r, sigma, T, option_type):
         raise ValueError("Invalid option type, must be 'call' or 'put'")
         
     return value
-
-
-#################################### MC 1.0
-
-def black_scholes_monte_carlo(S0, K, T, r, sigma, num_sims, option_type):
-    """
-    Computes the price of an European option using the Black-Scholes model and Monte Carlo simulation.
-    
-    Args:
-    S0: current stock price
-    K: strike price
-    T: time to maturity in years
-    r: risk-free interest rate
-    sigma: volatility of the stock
-    num_sims: number of simulations to perform
-    option_type: type of option, either 'call' or 'put'
-    
-    Returns:
-    The estimated price of the European option
-    """
-    random_number = np.random.standard_normal(num_sims) # draws random numbers from a standard normal distribution
-    S_T = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * random_number) # simulates the future stock price at time T
-    
-    if option_type == 'call':
-        option_price = np.exp(-r * T) * np.maximum(S_T - K, 0).mean()
-    elif option_type == 'put':
-        option_price = np.exp(-r * T) * np.maximum(K - S_T, 0).mean()
-    else:
-        print("Error: option type must be either 'call' or 'put'")
-        return None
-    
-    return option_price
-
-def plot_error_vs_num_sims():
-    """
-    Plots the average error between the Black-Scholes model and Monte Carlo simulation as a function of the number of simulations.
-    
-    Args:
-    n: number of times to repeat the calculation
-    
-    Returns:
-    Plot of the average error between the Black-Scholes model and Monte Carlo simulation as a function of the number of simulations
-    """
-    S0 = 100
-    K = 110
-    T = 1
-    r = 0.05
-    sigma = 0.2
-    num_sims_list = [10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 10000000]
-    option_type = 'call'
-    n = 20 # Number of iterations - for smoothing away random error
-    
-    bs_price = black_scholes(S0, K, T, r, sigma, option_type)
-    total_errors = []
-    for i in range(n):
-        mc_prices = [black_scholes_monte_carlo(S0, K, T, r, sigma, num_sims, option_type) for num_sims in num_sims_list]
-        errors = [np.abs(bs_price - mc_price) for mc_price in mc_prices]
-        total_errors.append(errors)
-    
-    avg_errors = np.mean(total_errors, axis=0)
-    for i, (num_sims, error) in enumerate(zip(num_sims_list, avg_errors)):
-        print(f"For {num_sims} simulations, the average absolute error is {error}")
-
-    plt.plot(num_sims_list, avg_errors, '-o', color='green')
-    plt.xscale('log')
-    plt.xlabel('Number of simulations')
-    plt.ylabel('Average absolute error')
-    plt.title('Average absolute error between Black-Scholes and Monte Carlo simulation')
-    plt.show()
-
-#plot_error_vs_num_sims()
-
-#plot_error_vs_num_sims()
-
-
-
-#################################### MC 2.0
+ 
+######################################################################## 💹 Monte Carlo for Black Scholes 💹
 
 def black_scholes_mc(S0, K, r, sigma, T, option_type, num_simulations, num_steps=252):
     """
@@ -197,60 +122,23 @@ def black_scholes_mc(S0, K, r, sigma, T, option_type, num_simulations, num_steps
     option_price = discount_factor * np.mean(payoff)
     return option_price
 
+######################################################################## 💹 Heston 💹 
 
-def plot_option_error_vs_simulations(S0=100, K=110, r=0.05, sigma=0.2, T=1, option_type="call"):
-
-    num_sims_list=[10, 50, 100, 500,  1000, 5000, 10000, 50000, 100000]
-
-    # Calculate Black-Scholes option price
-    d1 = (math.log(S0 / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
-    d2 = d1 - sigma * math.sqrt(T)
-    bs_price = 0
-    if option_type == "call":
-        bs_price = S0 * cumulative_prob(d1) - K * math.exp(-r * T) * cumulative_prob(d2)
-    elif option_type == "put":
-        bs_price = K * math.exp(-r * T) * cumulative_prob(-d2) - S0 * cumulative_prob(-d1)
-
-    # Calculate Monte Carlo option prices for different num_sims values
-    mc_prices = []
-    for num_sims in num_sims_list:
-        mc_price = black_scholes_mc(S0, K, r, sigma, T, option_type, num_sims)
-        mc_prices.append(mc_price)
-
-    # Calculate absolute error between Monte Carlo and Black-Scholes prices
-    errors = np.abs(np.array(mc_prices) - bs_price)
-
-    # Calculate standard deviation of Monte Carlo option prices
-    mc_std = np.std(mc_prices)
-
+def heston(S0, K, r, kappa, theta, sigma, rho, v0, T, option_type):
+    S0 = 100    # S0 (float): the current stock price. (Can be any value)
+    kappa = 1   # kappa (float): the mean reversion rate (often set between 0.5 and 1.5)
+    theta = 0.2 # theta (float): the long-run mean of the volatility process (often set between 0.1 and 0.5)
+    sigma = 0.5 # sigma (float): the volatility of the volatility process (often set between 0.1 and 1)
+    rho = -0.5  # rho (float): the correlation between the stock price and the volatility process (often set between -0.9 and 0.9)
+    v0 = 0.1    # v0 (float): the initial volatility (often set between 0.01 and 0.1)
+    r = 0.05    # r (float): the risk-free interest rate (often set between 0 and 0.1)
+    T = 1       # T (float): the time to maturity in years (often set between 0 and 10)
+    K = 100     # K (float): the strike price (can be any value)
+    option_type = "call" # option_type (str): either "call" or "put" to specify the type of option
     
-    # Print MC value, number of simulations, and error
-    print("Black-Scholes price: ", bs_price)
-    print("MC value\tNum_sims\tError")
-    for i in range(len(mc_prices)):
-        print("{:.4f}\t\t{}\t\t{:.4f}".format(mc_prices[i], num_sims_list[i], errors[i]))
+    # Note that the actual values used will depend on the specific scenario being modeled, and the values listed here are just typical ranges that one might use as a starting point.
 
-
-    # Plot error vs. num_sims on a log-log chart
-    plt.loglog(num_sims_list, errors, 'bo-', label='Absolute Error')
-    plt.xlabel('Number of Simulations')
-    plt.ylabel('Absolute Error')
-    plt.legend()
-    plt.show()
-
-    # Print standard deviation of Monte Carlo option prices
-    print("Standard deviation of Monte Carlo option prices: ", mc_std)
-
-
-plot_option_error_vs_simulations()
-
-
-
-
-
-
-#Functions to demostarte the code and run examples:
-
+######################################################################## 💹 Illustration and test functions 💹
 
 def illustrate_cumulative_prob():
     x = np.linspace(-3, 3, 1000)
@@ -435,11 +323,85 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
     plt.title('Black-Scholes put option values for a range of strike prices and volatility')
     plt.show()
 
+def plot_option_error_vs_simulations(S0=100, K=110, r=0.05, sigma=0.2, T=1, option_type="call"):
+
+    num_sims_list=[10, 50, 100, 500,  1000, 5000, 10000, 50000, 100000]
+
+    # Calculate Black-Scholes option price
+    d1 = (math.log(S0 / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+    bs_price = 0
+    if option_type == "call":
+        bs_price = S0 * cumulative_prob(d1) - K * math.exp(-r * T) * cumulative_prob(d2)
+    elif option_type == "put":
+        bs_price = K * math.exp(-r * T) * cumulative_prob(-d2) - S0 * cumulative_prob(-d1)
+
+    # Calculate Monte Carlo option prices for different num_sims values
+    mc_prices = []
+    for num_sims in num_sims_list:
+        mc_price = black_scholes_mc(S0, K, r, sigma, T, option_type, num_sims, num_steps=1000)
+        mc_prices.append(mc_price)
+
+    # Calculate absolute error between Monte Carlo and Black-Scholes prices
+    errors = np.abs(np.array(mc_prices) - bs_price)
+
+    # Calculate standard deviation of Monte Carlo option prices
+    mc_std = np.std(mc_prices)
+
+    
+    # Print MC value, number of simulations, and error
+    print("Black-Scholes price: ", bs_price)
+    print("MC value\tNum_sims\tError")
+    for i in range(len(mc_prices)):
+        print("{:.4f}\t\t{}\t\t{:.4f}".format(mc_prices[i], num_sims_list[i], errors[i]))
 
 
+    # Plot error vs. num_sims on a log-log chart
+    plt.loglog(num_sims_list, errors, 'bo-', label='Absolute Error')
+    plt.xlabel('Number of Simulations')
+    plt.ylabel('Absolute Error')
+    plt.legend()
+    plt.show()
+
+    # Print standard deviation of Monte Carlo option prices
+    print("Standard deviation of Monte Carlo option prices: ", mc_std)
+
+def plot_option_error_vs_timeStepLength():
+    S0 = 100
+    K = 110
+    r = 0.05
+    sigma = 0.2
+    T = 1
+
+    option_type = "call"
+    black_scholes_analyticalValue_reference = black_scholes(S0, K, r, sigma, T, option_type)
+    print("Black Scholes analytical value = ", black_scholes_analyticalValue_reference)
+
+    num_steps_list = [2**i for i in range(1, 11)]
+
+    mc_dt_values_list = []
+    for current_ammount_steps in num_steps_list:
+        mc_dt_values_list.append(black_scholes_mc(S0, K, r, sigma, T, option_type, 100000, current_ammount_steps))
+    error_for_each_dt_list = []
+
+    for mc_dt_value_current in mc_dt_values_list:
+        error_for_each_dt_list.append(abs(black_scholes_analyticalValue_reference - mc_dt_value_current))
+    
+    print("\nThe function plots the absolute error between the Monte Carlo simulated option price and the analytical Black-Scholes option price, as a function of the number of time steps used in the simulation.")
+    print("\nThe following table shows the Monte Carlo option price, the number of time steps used in the simulation, and the absolute error between the Monte Carlo simulated price and the analytical Black-Scholes price:")
+    print("\nMC Option Price\t\t\tNum Time Steps\t\tAbsolute Error")
+    for i in range(len(num_steps_list)):
+        print(mc_dt_values_list[i], "\t\t\t", num_steps_list[i], "\t\t\t", error_for_each_dt_list[i])
 
 
-# Main function to let the use navigate the code
+    plt.loglog(num_steps_list, error_for_each_dt_list, 'bo-', label='Absolute Error')
+    plt.xlabel('Number of Time Steps')
+    plt.ylabel('Absolute Error')
+    plt.legend()
+    plt.show()
+
+
+######################################################################## 💹 Main function that let's the user test different functions 💹
     
 def main():
     # This function asks the user to pick which part of the code they want to run. 
@@ -449,6 +411,8 @@ def main():
     print("2: Illustrate Geometric Brownian Motion example runs")
     print("3: Example runs - Black Scholes")
     print("4: Plotting of Black Scholes")
+    print("5: Plot error (as afunction of # of timesteps) comparing black_scholes_mc and black_scholes")
+    print("6: Plot error (as afunction of # of simulations) comparing black_scholes_mc and black_scholes")
 
     test = int(input("Enter the number of the test you would like to run: "))
     if test == 1:
@@ -459,9 +423,13 @@ def main():
         example_run_black_scholes()
     elif test == 4:
         plot_black_scholes()
+    elif test ==5:
+        plot_option_error_vs_timeStepLength()
+    elif test ==6:
+        plot_option_error_vs_timeStepLength()
     else:
         print("")
 
     print("\n\n The end of the main program.")
 
-#main()
+main()
