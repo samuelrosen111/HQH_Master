@@ -122,7 +122,63 @@ def black_scholes_mc(S0, K, r, sigma, T, option_type, num_simulations, num_steps
     option_price = discount_factor * np.mean(payoff)
     return option_price
 
-######################################################################## 💹 Heston 💹 
+######################################################################## 🍉 HESTON 🍉 
+
+def heston_Volatility(v0, theta, kappa, sigma, dt, num_steps, seed = None):
+    # Parameter:                        # Description and typical range
+
+    # v0                                # Initial volatility (typical range: [0.01, 0.1])
+    # theta                             # The mean to which the volatility reverts to. (typical range: [0.01, 0.1])
+    # kappa                             # Mean reversion speed (typical range: [0.1, 10])
+    # sigma                             # Volatility of volatility (typical range: [0.1, 0.5])
+    # dt                                # Time step lenght (typical range: [0.001, 0.01])
+    # num_steps                         # Number of steps (typical range: [10, 1000])
+
+    """
+    This function returns the volatility for the Hesotn model.
+    Returned value is an array with volatility values
+    """
+    np.random.seed(seed)
+    v = np.zeros(num_steps)
+    v[0] = v0
+    for i in range(1, num_steps):
+        dW = np.random.normal(loc=0, scale=np.sqrt(dt), size=1)
+        v[i] = v[i-1] + kappa * (theta - v[i-1]) * dt + sigma * np.sqrt(v[i-1]) * dW
+    return v
+
+def plot_Heston_Volatility():
+    # Set parameter values
+    v0 = 0.05                 # Initial volatility (typical range: [0.01, 0.1])
+    theta = 0.05              # The mean to which the volatility reverts to. (typical range: [0.01, 0.1])
+    kappa = 1.5               # Mean reversion speed (typical range: [0.1, 10])
+    sigma = 0.3               # Volatility of volatility (typical range: [0.1, 0.5])
+    dt = 0.01                 # Time step length (typical range: [0.001, 0.01])
+    num_steps = int(1/dt)     # Number of steps, set such that 1/dt is an integer value. Normalize total time-span to 1 for consistency
+
+
+
+
+    # Call the heston_Volatility function
+    vol = heston_Volatility(v0, theta, kappa, sigma, dt, num_steps)
+    
+    # Print the parameter values
+    print("Example run of Heston volatility with parameter values: ")
+    print("v0: ", v0)
+    print("theta: ", theta)
+    print("kappa: ", kappa)
+    print("sigma: ", sigma)
+    print("dt: ", dt)
+    print("num_steps: ", num_steps)
+
+
+    # Plot the volatility over time
+    time = np.linspace(0, (num_steps-1)*dt, num_steps)
+    plt.plot(time, vol)
+    plt.xlabel('Time')
+    plt.ylabel('Volatility')
+    plt.title('Heston Model Volatility over Time')
+    plt.show()
+
 
 def heston(S0, K, r, kappa, theta, sigma, rho, v0, T, option_type):
     S0 = 100    # S0 (float): the current stock price. (Can be any value)
@@ -138,9 +194,9 @@ def heston(S0, K, r, kappa, theta, sigma, rho, v0, T, option_type):
     
     # Note that the actual values used will depend on the specific scenario being modeled, and the values listed here are just typical ranges that one might use as a starting point.
 
-######################################################################## 💹 Illustration and test functions 💹
+######################################################################## 🍭 ILLUSTRATION ('test functions') 🍭
 
-def illustrate_cumulative_prob():
+def illustrate_Cumulative_Prob():
     x = np.linspace(-3, 3, 1000)
     y_cumulative = []
     y_normal = []
@@ -231,7 +287,7 @@ def illustrate_gbm():
     print("Higher volatility = lower expected value over time. Somewhere around 3 things get out of hand.")
     plt.show()
 
-def example_run_black_scholes():
+def example_Run_Black_Scholes():
     # Example 1
     S0 = 100 # initial (current) stock price
     K = 95 # strike price
@@ -272,7 +328,7 @@ def example_run_black_scholes():
         print(f"The price of the European {option_type} option is: {price}")
         coco = int(input("For another example enter 1 to quit enter 0: "))
 
-def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_points=100):
+def plot_Black_Scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_points=100):
     K_list = np.linspace(80, 120, num_points)
     call_values = np.zeros(num_points)
     put_values = np.zeros(num_points)
@@ -293,7 +349,7 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
     print("Strike price:  Call Value:  Put Value: ")
     for i in range (1,100):
         print("{:<14} {:<12} {:<12}".format(round(K_list[i], 2), round(call_values[i], 2), round(put_values[i], 2)))
-        time.sleep(0.1)
+        #time.sleep(0.1)
 
 
     plt.plot(K_list, call_values, 'b', label='Call option')
@@ -323,7 +379,50 @@ def plot_black_scholes(S0=100, r=0.05, sigma=0.2, T=1, option_type='call', num_p
     plt.title('Black-Scholes put option values for a range of strike prices and volatility')
     plt.show()
 
-def plot_option_error_vs_simulations(S0=100, K=110, r=0.05, sigma=0.2, T=1, option_type="call"):
+def plot_Option_Error_vs_TimeStepLength():
+    # Note: these example values are the same as in "plot_Option_Error_vs_Simulations():"
+    S0 = 100
+    K = 110
+    r = 0.05
+    sigma = 0.2
+    T = 1
+
+    option_type = "call"
+    black_scholes_analyticalValue_reference = black_scholes(S0, K, r, sigma, T, option_type)
+    print("Black Scholes analytical value = ", black_scholes_analyticalValue_reference)
+
+    num_steps_list = [2**i for i in range(1, 11)]
+
+    mc_dt_values_list = []
+    for current_ammount_steps in num_steps_list:
+        mc_dt_values_list.append(black_scholes_mc(S0, K, r, sigma, T, option_type, 100000, current_ammount_steps))
+    error_for_each_dt_list = []
+
+    for mc_dt_value_current in mc_dt_values_list:
+        error_for_each_dt_list.append(abs(black_scholes_analyticalValue_reference - mc_dt_value_current))
+    
+    print("\nThe function plots the absolute error between the Monte Carlo simulated option price and the analytical Black-Scholes option price, as a function of the number of time steps used in the simulation.")
+    print("\nThe following table shows the Monte Carlo option price, the number of time steps used in the simulation, and the absolute error between the Monte Carlo simulated price and the analytical Black-Scholes price:")
+    print("\nMC Option Price\t\t\tNum Time Steps\t\tAbsolute Error")
+    for i in range(len(num_steps_list)):
+        print(mc_dt_values_list[i], "\t\t\t", num_steps_list[i], "\t\t\t", error_for_each_dt_list[i])
+
+    plt.title('Error in the Monte Carlo Approximation relative time steps')
+    plt.loglog(num_steps_list, error_for_each_dt_list, 'bo-', label='Absolute Error')
+    plt.xlabel('Number of Time Steps')
+    plt.ylabel('Absolute Error')
+    plt.legend()
+    plt.show()
+
+def plot_Option_Error_vs_Simulations():
+    # Note: these example values are the same as in "plot_Option_Error_vs_TimeStepLength():"
+    S0 = 100                #Initial price
+    K = 110                 #Strike Price
+    r = 0.05                # Risk free interest rate
+    sigma = 0.2             # Volatility
+    T = 1                   # Total duration time (normalized to 1)
+    option_type = "call"
+
 
     num_sims_list=[10, 50, 100, 500,  1000, 5000, 10000, 50000, 100000]
 
@@ -366,41 +465,6 @@ def plot_option_error_vs_simulations(S0=100, K=110, r=0.05, sigma=0.2, T=1, opti
     # Print standard deviation of Monte Carlo option prices
     print("Standard deviation of Monte Carlo option prices: ", mc_std)
 
-def plot_option_error_vs_timeStepLength():
-    S0 = 100
-    K = 110
-    r = 0.05
-    sigma = 0.2
-    T = 1
-
-    option_type = "call"
-    black_scholes_analyticalValue_reference = black_scholes(S0, K, r, sigma, T, option_type)
-    print("Black Scholes analytical value = ", black_scholes_analyticalValue_reference)
-
-    num_steps_list = [2**i for i in range(1, 11)]
-
-    mc_dt_values_list = []
-    for current_ammount_steps in num_steps_list:
-        mc_dt_values_list.append(black_scholes_mc(S0, K, r, sigma, T, option_type, 100000, current_ammount_steps))
-    error_for_each_dt_list = []
-
-    for mc_dt_value_current in mc_dt_values_list:
-        error_for_each_dt_list.append(abs(black_scholes_analyticalValue_reference - mc_dt_value_current))
-    
-    print("\nThe function plots the absolute error between the Monte Carlo simulated option price and the analytical Black-Scholes option price, as a function of the number of time steps used in the simulation.")
-    print("\nThe following table shows the Monte Carlo option price, the number of time steps used in the simulation, and the absolute error between the Monte Carlo simulated price and the analytical Black-Scholes price:")
-    print("\nMC Option Price\t\t\tNum Time Steps\t\tAbsolute Error")
-    for i in range(len(num_steps_list)):
-        print(mc_dt_values_list[i], "\t\t\t", num_steps_list[i], "\t\t\t", error_for_each_dt_list[i])
-
-
-    plt.loglog(num_steps_list, error_for_each_dt_list, 'bo-', label='Absolute Error')
-    plt.xlabel('Number of Time Steps')
-    plt.ylabel('Absolute Error')
-    plt.legend()
-    plt.show()
-
-
 ######################################################################## 💹 Main function that let's the user test different functions 💹
     
 def main():
@@ -413,20 +477,23 @@ def main():
     print("4: Plotting of Black Scholes")
     print("5: Plot error (as afunction of # of timesteps) comparing black_scholes_mc and black_scholes")
     print("6: Plot error (as afunction of # of simulations) comparing black_scholes_mc and black_scholes")
+    print("7: Illustration of Heston volatility")
 
     test = int(input("Enter the number of the test you would like to run: "))
     if test == 1:
-        illustrate_cumulative_prob()
+        illustrate_Cumulative_Prob()
     elif test == 2:
         illustrate_gbm()
     elif test == 3:
-        example_run_black_scholes()
+        example_Run_Black_Scholes()
     elif test == 4:
-        plot_black_scholes()
+        plot_Black_Scholes()
     elif test ==5:
-        plot_option_error_vs_timeStepLength()
+        plot_Option_Error_vs_TimeStepLength()
     elif test ==6:
-        plot_option_error_vs_timeStepLength()
+        plot_Option_Error_vs_Simulations()
+    elif test ==7:
+        plot_Heston_Volatility()
     else:
         print("")
 
