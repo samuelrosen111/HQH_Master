@@ -460,7 +460,6 @@ def illustrate_heston_Volatility():
     plt.legend()
     plt.show()
 
-
 def main():
     print("Choose test")
     print("1: 'illustrate_heston' with example values")

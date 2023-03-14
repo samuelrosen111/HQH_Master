@@ -122,34 +122,6 @@ def black_scholes_mc(S0, K, r, sigma, T, option_type, num_simulations, num_steps
     option_price = discount_factor * np.mean(payoff)
     return option_price
 
-######################################################################## 💹 4 Heston 💹
-
-def heston_Volatility(v0, theta, kappa, sigma, dt, num_steps):
-    # Parameter:                        # Description and typical range
-
-    # v0                                # Initial volatility (typical range: [0.01, 0.1])
-    # theta                             # The mean to which the volatility reverts to. (typical range: [0.01, 0.1])
-    # kappa                             # Mean reversion speed (typical range: [0.1, 10])
-    # sigma                             # Volatility of volatility (typical range: [0.1, 0.5])
-    # dt                                # Time step lenght (typical range: [0.001, 0.01])
-    # num_steps                         # Number of steps (typical range: [10, 1000])
-
-    """
-    This function returns the volatility for the Hesotn model.
-    Returned value is an array with volatility values
-    """
-    
-    np.random.seed(None) #initialize random seed for the stochastic component - meaning we'll get new random numbers every iteration
-    volatility = np.zeros(num_steps) # initialize the time array with the volatility for each timestep
-    volatility[0] = v0 # first time step has the initial volatility
-
-    for i in range(1, num_steps): 
-        dW = np.random.normal(loc=0, scale=np.sqrt(dt), size=1) # Random variable drawn from normal distribution with expectational value = 0 and std.dev = sqrt(dt)
-        # Then updates the volatility with the heston formula (using Euler Maruyama for time-discretization)
-        volatility[i] = volatility[i-1] + kappa * (theta - volatility[i-1]) * dt + sigma * np.sqrt(volatility[i-1]) * dW
-    return volatility
-
-
 
 ######################################################################## 🍭 ILLUSTRATION ('test functions') 🍭
 
@@ -428,84 +400,6 @@ def plot_option_error_vs_simulations():
     # Print standard deviation of Monte Carlo option prices
     print("Standard deviation of Monte Carlo option prices: ", mc_std)
 
-# 7) Plots an example development of Heston volatility with example values (different for each run due to new random numbers every run)
-def example_plot_heston_volatility():
-    # Set parameter values
-    v0 = 0.05                 # Initial volatility (typical range: [0.01, 0.1])
-    theta = 0.05              # The mean to which the volatility reverts to. (typical range: [0.01, 0.1])
-    kappa = 1.5               # Mean reversion speed (typical range: [0.1, 10])
-    sigma = 0.3               # Volatility of volatility (typical range: [0.1, 0.5])
-    dt = 0.01                 # Time step length (typical range: [0.001, 0.01])
-    num_steps = int(1/dt)     # Number of steps, set such that 1/dt is an integer value. Normalize total time-span to 1 for consistency
-
-    # Call the heston_Volatility function
-    volatility_over_time = heston_Volatility(v0, theta, kappa, sigma, dt, num_steps)
-    
-
-
-    # Print the parameter values
-    print("Example run of Heston volatility with parameter values: ")
-    print("v0: ", v0)
-    print("theta: ", theta)
-    print("kappa: ", kappa)
-    print("sigma: ", sigma)
-    print("dt: ", dt)
-    print("num_steps: ", num_steps)
-
-    # Print the volatility for each time step
-    print("Volatility for each time step: \n ")
-    time = np.linspace(0, (num_steps-1)*dt, num_steps)
-    for i in range(num_steps):
-        print("{:.2f}\t{:.4f}".format(time[i], volatility_over_time[i]))
-
-    # Plot the volatility over time
-    time = np.linspace(0, (num_steps-1)*dt, num_steps)
-    plt.plot(time, volatility_over_time)
-    plt.xlabel('Time')
-    plt.ylabel('Volatility')
-    plt.title('Heston Model Volatility over Time')
-    plt.show()
-
-# 8) Provides the user with typical values for Heston volatility and alow them to try different combination to see how the parameters affect the output
-def user_input_plot_heston_volatility(): #GPT
-    # Get parameter values from user input
-
-    print("Note: for experimental purposes you can put in any values (even ouside the normal range) to see how the different parameters affect the volatility \n")
-
-    v0 = float(input("Enter the initial volatility (typical range: [0, 0.3]): \t")) # For reference, Microsoft stock has about 30% volatility
-    theta = float(input("Enter the mean to which the volatility reverts to (typical range: [0.01, 0.1]): \t"))
-    kappa = float(input("Enter the mean reversion speed (typical range: [0.1, 10]): \t\t"))
-    sigma = float(input("Enter the volatility of volatility (typical range: [0.1, 0.5]): \t"))
-    dt = float(input("Enter the time step length (typical range: [0.001, 0.01]): \t\t"))
-    num_steps = int(input("Enter the number of steps (typical range: [10, 1000]): \t\t"))
-
-
-    # Print the parameter values in terminal
-    print("\n Parameter values for the Heston volatility model:")
-    print("v0: ", v0)
-    print("theta: ", theta)
-    print("kappa: ", kappa)
-    print("sigma: ", sigma)
-    print("dt: ", dt)
-    print("num_steps: ", num_steps)
-
-    # Call the heston_Volatility function and create array with volatility for each discrete time-step
-    volatility_over_time = heston_Volatility(v0, theta, kappa, sigma, dt, num_steps)
-
-    # Print the volatility for each time step in terminal
-    print("\nVolatility for each time step:")
-
-    print("Time step\tVolatility")
-    for i, vol in enumerate(volatility_over_time):
-        print("{:.2f}\t{:.4f}".format(i*dt, vol))
-
-    # Plot the volatility over time
-    time = np.linspace(0, (num_steps-1)*dt, num_steps)
-    plt.plot(time, volatility_over_time, color='green')
-    plt.xlabel('Time')
-    plt.ylabel('Volatility')
-    plt.title('Heston Model Volatility over Time')
-    plt.show()
 
 ######################################################################## 💹 Main function that let's the user test different functions 💹
     
@@ -519,8 +413,7 @@ def main():
     print("4: Plotting of Black Scholes")
     print("5: Plot error (as afunction of # of timesteps) comparing black_scholes_mc and black_scholes")
     print("6: Plot error (as afunction of # of simulations) comparing black_scholes_mc and black_scholes")
-    print("7: Illustration (with example values) of Heston volatility")
-    print("8: Choose your own input values for heaston volatility")
+
 
     which_test_to_do = int(input("Enter the number of the test you would like to run: "))
     if which_test_to_do == 1:
@@ -535,12 +428,8 @@ def main():
         plot_Option_Error_vs_TimeStepLength()
     elif which_test_to_do ==6:
         plot_option_error_vs_simulations()
-    elif which_test_to_do ==7:
-        example_plot_heston_volatility()
-    elif which_test_to_do ==8:
-        user_input_plot_heston_volatility()
     else:
-        print("")
+        print("Invali input, program skipped")
 
     print("\n\n The end of the main program.")
 
