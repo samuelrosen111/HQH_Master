@@ -1,6 +1,7 @@
 # Kolla upp referens mot annan kod och sätt samma värden se om samma resultat
 # Jämför med heston biliotek
 # Ett referensvärde
+
 # Maxad simulering med 10000000 slumptal 1000 tidsteg = referensvärde
 # Simuleringar upp till 200,000 (med 1000, 10.000 ish) några punkter ()
 # Kolla mot tidssteg och si uleringar som med BS (maxa alla parametrar som referens)
@@ -9,27 +10,26 @@
 # Euler Maruyama convergence 1. EF fast för SDE.
 # EF missar om stort tidssteg + stor derivata
 
-
-# Next: HQH (läs på heldag)
-# MC istället för COS
-
-
-
 # 1) Verifiera Heston
 # 2) Kolla konvergens för Heston
 # 3) 
 
+
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm  # pip install tqdm
 
+
+# BS och Heston som *appendix*
 
 ################################################## Tool functions
 
 def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r):
+    # Heston_model_MonteCarlo: Simulates asset prices and volatilities using the Heston model via Monte Carlo simulation
     """
-    (Credit for correct theory: https://quantpy.com.au/stochastic-volatility-models/simulating-heston-model-in-python/)
+    (Credit for correct theory and function implementation: https://quantpy.com.au/stochastic-volatility-models/simulating-heston-model-in-python/)
+
     Simulate asset prices and variance using the Heston model.
-    
     Parameters:
     - S0: initial asset price (depends on asset)
     - v0: initial variance (typical range: 0 < v0 < 1)
@@ -40,14 +40,13 @@ def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
     - T: time of simulation in years (typical range: 0 < T < 10)
     - num_steps: number of time steps (typical range: 10 < N < 1000)
     - num_sims: number of scenarios/simulations (typical range: 10 < M < 1000)
-    - r: risk-free interest rate (typical range: 0 < r < 0.1) ... 0.1 would be 10%
+    - r: risk-free interest rate (typical range: 0 < r < 0.1; e.g., 0.1 would be a 10% interest rate)
 
     
     Returns:
     - numpy array of asset prices over time (shape: (N+1, M))
     - numpy array of variances over time (shape: (N+1, M))
     """
-
     # Calculate time increment
     dt = T/num_steps
     
@@ -62,14 +61,16 @@ def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
     # Sample correlated brownian motions under risk-neutral measure
     Z = np.random.multivariate_normal(drift_term, covariance_matrix, (num_steps,num_sims))
     
-    # Calculate asset prices and variances over time
-    for i in range(1,num_steps+1):
-        stonk[i] = stonk[i-1] * np.exp( (r - 0.5*volatility[i-1])*dt + np.sqrt(volatility[i-1] * dt) * Z[i-1,:,0] )
-        volatility[i] = np.maximum(volatility[i-1] + kappa*(theta-volatility[i-1])*dt + sigma*np.sqrt(volatility[i-1]*dt)*Z[i-1,:,1],0)
+    # Calculate asset prices and variances over time, tqdm is used to display
+    for i in tqdm(range(1, num_steps + 1), desc="Simulation progress", ncols=100):
+        stonk[i] = stonk[i - 1] * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
+        volatility[i] = np.maximum(volatility[i - 1] + kappa * (theta - volatility[i - 1]) * dt + sigma * np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
+
 
     return stonk, volatility
 
 def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, option_type, K): 
+    # Heston_option: Calculates European option prices using the Heston model and Monte Carlo simulation
     """
     Calculate the price of a European call or put option using the Heston model.
     
@@ -83,8 +84,8 @@ def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, o
     - T: time of simulation in years (typical range: 0 < T < 10)
     - num_steps: number of time steps (typical range: 10 < N < 1000)
     - num_sims: number of scenarios/simulations (typical range: 10 < M < 1000)
-    - r: risk-free interest rate (typical range: 0 < r < 0.1)
-    - option_type: either 'call' or 'put'
+    - r: risk-free interest rate (typical range: 0 < r < 0.1; e.g., 0.1 would be a 10% interest rate)
+    - option_type: type of the option, here is it either 'call' or 'put'
     - K: strike price of the option
     
     Returns:
@@ -110,9 +111,50 @@ def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, o
     
     return option_price
 
+def error_handling(S0=None, v0=None, rho=None, kappa=None, theta=None, sigma=None, T=None, num_steps=None, num_sims=None, r=None):
+    # Error_handling: Validates Heston model parameters, detects errors, and prompts user to continue or retry with new input
+    errors = []
+
+    if S0 is not None and S0 <= 0:
+        errors.append("Initial asset price (S0) must be greater than 0.")
+    if v0 is not None and v0 <= 0:
+        errors.append("Initial variance (v0) must be greater than 0.")
+    if rho is not None and not (-1 < rho < 1):
+        errors.append("Correlation (rho) must be in the range (-1, 1).")
+    if kappa is not None and kappa <= 0:
+        errors.append("Rate of mean reversion (kappa) must be greater than 0.")
+    if theta is not None and theta <= 0:
+        errors.append("Long-term mean of variance (theta) must be greater than 0.")
+    if sigma is not None and sigma <= 0:
+        errors.append("Volatility of volatility (sigma) must be greater than 0.")
+    if T is not None and T <= 0:
+        errors.append("Time of simulation (T) must be greater than 0 years.")
+    if num_steps is not None and num_steps < 1:
+        errors.append("Number of time steps (num_steps) cannot be less than 1")
+    if num_sims is not None and num_sims < 1:
+        errors.append("Number of simulations (num_sims) cannot be less than 1")
+    if r is not None and r < 0:
+        errors.append("Risk-free interest rate (r) must be non-negative.")
+
+    if errors:
+        print("The following errors were detected:")
+        for error in errors:
+            print(f"- {error}")
+
+        user_input = input("Do you want to continue despite these errors? (y/n): ").lower()
+        if user_input == 'y':
+            print("Continuing with the given parameters...")
+            return True
+        else:
+            print("Exiting the program.")
+            exit(0)
+    else:
+        return True
+
 ################################################## Illustrative functions
 
 def illustrate_heston():
+    # Illustrate_heston: A wrapper function for running multiple illustrative examples of the Heston model
     """
     Illustrates the Heston model by simulating asset prices and variances over time.
     """
@@ -164,7 +206,29 @@ def illustrate_heston():
     ax2.set_ylabel('Variance')
     plt.show()
 
+def calculate_correlation(x, y):
+    """
+    Calculates the correlation coefficient between two arrays using Pearson's formula.
+    
+    Args:
+    x (array-like): First array.
+    y (array-like): Second array.
+    
+    Returns:
+    float: Correlation coefficient between x and y.
+    """
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    
+    numerator = np.sum((x - x_mean) * (y - y_mean))
+    denominator = np.sqrt(np.sum((x - x_mean) ** 2) * np.sum((y - y_mean) ** 2))
+    
+    corr_coef = numerator / denominator
+    
+    return corr_coef
+
 def single_run_heston_volatility_vs_price():
+    # Single_run_heston_volatility_vs_price: Simulates asset prices and variances over time using the Heston model for a single run with user-specified parameters
     """
     Simulates asset prices and variances over time using the Heston model for a single run with user-specified parameters.
     """
@@ -174,15 +238,23 @@ def single_run_heston_volatility_vs_price():
     auto = input("Do you want to enter your own parameter values? (y/n, default is 'n') ").lower()
 
     if auto == "y":
-        S0 = float(input(f"Enter initial asset price (typical range: varies by asset): "))
-        T = float(input(f"Enter time horizon in years (typical range: 0 < T < 10): "))
-        r = float(input(f"Enter risk-free interest rate (typical range: 0 < r < 0.1): "))
-        num_steps = int(input(f"Enter number of time steps in simulation (typical range: 10 < num_steps < 1000): "))
-        kappa = float(input(f"Enter rate of mean reversion of variance under risk-neutral dynamics (typical range: 0 < kappa < 10): "))
-        theta = float(input(f"Enter long-term mean of variance under risk-neutral dynamics (typical range: 0 < theta < 1) (most typical value: {0.20**2:.2f}): "))
-        v0 = float(input(f"Enter initial variance under risk-neutral dynamics (typical range: 0 < v0 < 1): "))
-        rho = float(input(f"Enter correlation between returns and variances under risk-neutral dynamics (typical range: -1 < rho < 1): "))
-        sigma = float(input(f"Enter volatility of volatility (typical range: 0 < sigma < 1): "))
+        while True:
+            S0 = float(input(f"Enter initial asset price (typical range: varies by asset): "))
+            T = float(input(f"Enter time horizon in years (typical range: 0 < T < 10): "))
+            r = float(input(f"Enter risk-free interest rate (typical range: 0 < r < 0.1): "))
+            num_steps = int(input(f"Enter number of time steps in simulation (typical range: 10 < num_steps < 1000): "))
+            kappa = float(input(f"Enter rate of mean reversion of variance under risk-neutral dynamics (typical range: 0 < kappa < 10): "))
+            theta = float(input(f"Enter long-term mean of variance under risk-neutral dynamics (typical range: 0 < theta < 1) (most typical value: {0.20**2:.2f}): "))
+            v0 = float(input(f"Enter initial variance under risk-neutral dynamics (typical range: 0 < v0 < 1): "))
+            rho = float(input(f"Enter correlation between returns and variances under risk-neutral dynamics (typical range: -1 < rho < 1): "))
+            sigma = float(input(f"Enter volatility of volatility (typical range: 0 < sigma < 1): "))
+            
+            if error_handling(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r):
+                user_input = input("Bad input detected. 'c' = continue despite abnormal input. 'r' = retry with new input: ")
+            if user_input.lower() == 'r':
+                print("")
+            else:
+                break
     else:
         # Use example Heston parameter values
         S0 = 100.0             # initial asset price (typical range: varies by asset)
@@ -209,10 +281,11 @@ def single_run_heston_volatility_vs_price():
 
     # simulate asset prices and variances using the Heston model
     simulated_stock_price, simulated_volatility = heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma,T, num_steps, num_sims, r)
+    correlation__coefficient_btw_volatility_price = calculate_correlation(simulated_stock_price, simulated_volatility)
 
     # plot asset prices and variances over time
     fig, ax1 = plt.subplots(figsize=(12,5))
-    ax1.set_title('Heston Model Asset Prices and Variance')
+    ax1.set_title(f'Heston Model Asset Prices and Variance (in this run correlation was: {correlation__coefficient_btw_volatility_price:.2f})')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Stock Price', color='r')
     ax1.plot(np.linspace(0,T,num_steps+1), simulated_stock_price, color='r')
@@ -223,7 +296,8 @@ def single_run_heston_volatility_vs_price():
     ax2.tick_params(axis='y', labelcolor='b')
     plt.show()
 
-def heston_mc_example_run():
+def heston_mc_option_example_run():
+    # Heston_mc_example_run: Demonstrates the Heston model Monte Carlo simulation and displays the asset prices and variances
     # Set parameter values
     S0 = 100.0     # Initial asset price (typically in the range of $10 to $1000)
     v0 = 0.05      # Initial variance or volatility of the asset price (typically between 0 and 1)
@@ -259,6 +333,7 @@ def heston_mc_example_run():
     print("Option Price: {:.4f}".format(option_price))
 
 def heston_mc_number_of_timesteps_convergence():
+    # Heston_mc_number_of_timesteps_convergence: Illustrates the convergence of the Heston model Monte Carlo simulation with respect to the number of time steps
     """    
     This function plots:
     - The error of the Heston_MC method v.s. amount of timesteps
@@ -272,7 +347,7 @@ def heston_mc_number_of_timesteps_convergence():
     theta = 0.05       # Long-term mean of the variance process (typical range: 0 < theta < 1)
     sigma = 1.0        # Volatility of the variance process (volatility of volatility) (typical range: 0 < sigma < 1)
     T = 1.0            # Time to expiration (in years) (typical range: 0 < T < 10)
-    num_sims = 10000   # Number of Monte Carlo simulations (typical range: 10 < num_sims < 1000)
+    num_sims = 50000   # Number of Monte Carlo simulations (typical range: 10 < num_sims < 1000)
     r = 0.02           # Risk-free interest rate (typical range: 0 < r < 0.1)
     option_type = 'call' # Type of the option ('call' or 'put')
     K = 110.0          # Strike price of the option
@@ -323,11 +398,13 @@ def heston_mc_number_of_timesteps_convergence():
     plt.show()
 
 def heston_mc_number_of_simulations_convergence():
+    # Error vs sims kolla bara 4 punkter och större span
     """    
     This function plots:
     - The error of the Heston_MC method v.s. number of simulations
     - Linear best-fit approximation to the error on a log-log scale
     """
+    print("Calculating Heston value convergence, this may take a while...")
 
     S0 = 100.0         # Initial stock price (depends on asset)
     v0 = 0.05          # Initial variance (typical range: 0 < v0 < 1)
@@ -336,25 +413,29 @@ def heston_mc_number_of_simulations_convergence():
     theta = 0.05       # Long-term mean of the variance process (typical range: 0 < theta < 1)
     sigma = 1.0        # Volatility of the variance process (volatility of volatility) (typical range: 0 < sigma < 1)
     T = 1.0            # Time to expiration (in years) (typical range: 0 < T < 10)
-    num_steps = 100    # Number of time steps in simulation (typical range: 10 < num_steps < 1000)
+    num_steps = 1000    # Number of time steps in simulation (typical range: 10 < num_steps < 1000)
     r = 0.02           # Risk-free interest rate (typical range: 0 < r < 0.1)
     option_type = 'call' # Type of the option ('call' or 'put')
     K = 110.0          # Strike price of the option
     good_approx_sims = 100000 # Number of simulations for the "good" approximation (typically large)
-    max_sims = 100     # Maximum number of simulations to consider (typically in the range of 10 to 1000)
+    ammmount_of_simulation_steps = 20     # Maximum number of simulations to consider (typically in the range of 10 to 1000)
 
     # Calculate the "good" approximation using a large number of simulations
     good_approx = heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, good_approx_sims, r, option_type, K)
+    print("Reference approximation calculated")
     
     # Initialize arrays to store Heston option prices and errors for different numbers of simulations
-    heston_values_vs_sims = np.zeros(max_sims)
-    heston_mc_err_vs_sims = np.zeros(max_sims)
+    heston_values_vs_sims = np.zeros(ammmount_of_simulation_steps)
+    heston_mc_err_vs_sims = np.zeros(ammmount_of_simulation_steps)
     
     # Loop over different numbers of simulations and calculate Heston option prices
-    num_sims = np.logspace(1, 3, num=max_sims, dtype=int)
+    num_sims = np.logspace(1, 4, num=ammmount_of_simulation_steps, dtype=int)
+    total = len(num_sims)
     for i, sims in enumerate(num_sims):
         heston_values_vs_sims[i] = heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, sims, r, option_type, K)
         heston_mc_err_vs_sims[i] = np.abs(good_approx - heston_values_vs_sims[i])
+        print(f'{(i+1)/total:.2%} simulations complete')
+
     
     # Calculate the linear best-fit approximation to the error array in log-log scale
     log_sims = np.log10(num_sims)
@@ -387,6 +468,7 @@ def heston_mc_number_of_simulations_convergence():
     plt.show()
 
 def heston_Volatility(v0, theta, kappa, sigma, dt, num_steps):
+    # ℹ️ heston_Volatility: Simulates volatilities using the Heston model and displays the volatilities over time
     # Parameter:                        # Description and typical range
 
     # v0                                # Initial volatility (typical range: [0.01, 0.1])
@@ -412,6 +494,7 @@ def heston_Volatility(v0, theta, kappa, sigma, dt, num_steps):
     return volatility
 
 def illustrate_heston_Volatility():
+    # ℹ️ illustrate_heston_Volatility: Wrapper function for running the heston_Volatility function to demonstrate volatilities using the Heston model
     user_choice = input("Would you like to use example parameters or manually enter custom parameters? Enter 'example' or 'custom': ")
     
     if user_choice == 'example':
@@ -460,11 +543,14 @@ def illustrate_heston_Volatility():
     plt.legend()
     plt.show()
 
+################################################## Reference check
+
 def main():
+    # Main: The main function that executes the program and calls the appropriate functions based on user input
     print("Choose test")
     print("1: 'illustrate_heston' with example values")
-    print("2: Single run of Heston showing stockprice vs volatility")
-    print("3: Make one example run of Heston model")
+    print("2: Single run of Heston showing stockprice and volatility")
+    print("3: Make one example run of Heston model to calculate an Option price")
     print("4: Plot heston_mc_number_of_timesteps_convergence")
     print("5: Plot heston_mc_number_of_simulations_convergence")
     print("6: Visualize Heston Volatility")
@@ -475,7 +561,7 @@ def main():
     if user_choice==2:
         single_run_heston_volatility_vs_price()
     if user_choice==3:
-        heston_mc_example_run()
+        heston_mc_option_example_run()
     if user_choice==4:
         heston_mc_number_of_timesteps_convergence()
     if user_choice==5:
