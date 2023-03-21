@@ -1,25 +1,7 @@
-import math
-import time
-import numpy as np
-import random
-import matplotlib.pyplot as plt
+print("Starting test program: ")
 
-"""""
-num_sims = 20
-random_number = np.random.standard_normal(num_sims)
+import tqdm
+print(tqdm.__file__)
 
-for i in random_number:
-    print(i)
+print("end of test program")
 
-
-print("LEN  ", len(random_number))
-"""
-
-
-a = np.array([[1,5], [5,1]])
-b = [1,5], [5,1]
-
-
-print(a) 
-print("")
-print(b)

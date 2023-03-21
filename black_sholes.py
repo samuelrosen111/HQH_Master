@@ -4,7 +4,6 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 
-
 ######################################################################## 💹 1 Basic Functions 💹 
 
 def cumulative_prob(x): #cumulative_probability_standard_normal_distribution mu= 0, sigma = 1
