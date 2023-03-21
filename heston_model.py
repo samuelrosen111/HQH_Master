@@ -1,24 +1,6 @@
-# Kolla upp referens mot annan kod och sätt samma värden se om samma resultat
-# Jämför med heston biliotek
-# Ett referensvärde
-
-# Maxad simulering med 10000000 slumptal 1000 tidsteg = referensvärde
-# Simuleringar upp till 200,000 (med 1000, 10.000 ish) några punkter ()
-# Kolla mot tidssteg och si uleringar som med BS (maxa alla parametrar som referens)
-
-# sqrt(num_sim) = O(1/2) convergence. 
-# Euler Maruyama convergence 1. EF fast för SDE.
-# EF missar om stort tidssteg + stor derivata
-
-# 1) Verifiera Heston
-# 2) Kolla konvergens för Heston
-# 3) 
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm  # pip install tqdm
-
 
 # BS och Heston som *appendix*
 
