@@ -1,3 +1,20 @@
+""""
+BS är en SDE (samma med Heston) 
+Optionspris ges av PDE i BS kan man lösa PDE, BS = värmelendingsekvation i 1D
+Heston PDE finns ingen explicit lösning, 
+
+I teori visa vägar eller grafik på hur modellen fungerar. 
+
+____
+
+Korrelation mellan 
+
+Två bronska rörelser S och W (rho)
+
+
+Rho * V_2... 
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm  # pip install tqdm
@@ -16,6 +33,7 @@ def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
     - S0: initial asset price (depends on asset)
     - v0: initial variance (typical range: 0 < v0 < 1)
     - rho: correlation between asset returns and variance (typical range: -1 < rho < 1)
+    (Rho typically negative high stockprice means low vol usually)
     - kappa: rate of mean reversion in variance process (typical range: 0 < kappa < 10)
     - theta: long-term mean of variance process (typical range: 0 < theta < 1)
     - sigma: volatility of volatility or the degree of randomness in the variance process (typical range: 0 < sigma < 1)
@@ -246,7 +264,7 @@ def single_run_heston_volatility_vs_price():
         kappa = 3              # rate of mean reversion of variance under risk-neutral dynamics (typical range: 0 < kappa < 10)
         theta = 0.20**2        # long-term mean of variance under risk-neutral dynamics (typical range: 0 < theta < 1)
         v0 = 0.25**2           # initial variance under risk-neutral dynamics (typical range: 0 < v0 < 1)
-        rho = 0.7              # correlation between returns and variances under risk-neutral dynamics (typical range: -1 < rho < 1)
+        rho = 0.7              # correlation between returns and variances under risk-neutral dynamics (typical range: -1 < rho < 1) "instantanious corelation" enligt erik btw W and W_s
         sigma = 0.6            # volatility of volatility (typical range: 0 < sigma < 1)
     
     # Print parameter values
