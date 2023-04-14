@@ -1,25 +1,6 @@
-""""
-BS är en SDE (samma med Heston) 
-Optionspris ges av PDE i BS kan man lösa PDE, BS = värmelendingsekvation i 1D
-Heston PDE finns ingen explicit lösning, 
-
-I teori visa vägar eller grafik på hur modellen fungerar. 
-
-____
-
-Korrelation mellan 
-
-Två bronska rörelser S och W (rho)
-
-
-Rho * V_2... 
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm  # pip install tqdm
-
-# BS och Heston som *appendix*
 
 ################################################## Tool functions
 
@@ -90,8 +71,7 @@ def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, o
     
     Returns:
     - The price of the option
-    """
-    
+    """    
     # Get the simulated asset prices and variances
     stock_prices, variances = heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r)
     
@@ -111,7 +91,7 @@ def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, o
     
     return option_price
 
-def error_handling(S0=None, v0=None, rho=None, kappa=None, theta=None, sigma=None, T=None, num_steps=None, num_sims=None, r=None):
+def heston_parameters_are_valid(S0=None, v0=None, rho=None, kappa=None, theta=None, sigma=None, T=None, num_steps=None, num_sims=None, r=None):
     # Error_handling: Validates Heston model parameters, detects errors, and prompts user to continue or retry with new input
     errors = []
 
@@ -119,7 +99,7 @@ def error_handling(S0=None, v0=None, rho=None, kappa=None, theta=None, sigma=Non
         errors.append("Initial asset price (S0) must be greater than 0.")
     if v0 is not None and v0 <= 0:
         errors.append("Initial variance (v0) must be greater than 0.")
-    if rho is not None and not (-1 < rho < 1):
+    if rho is not None and not (-1 <= rho <= 1):
         errors.append("Correlation (rho) must be in the range (-1, 1).")
     if kappa is not None and kappa <= 0:
         errors.append("Rate of mean reversion (kappa) must be greater than 0.")
@@ -144,7 +124,7 @@ def error_handling(S0=None, v0=None, rho=None, kappa=None, theta=None, sigma=Non
         user_input = input("Do you want to continue despite these errors? (y/n): ").lower()
         if user_input == 'y':
             print("Continuing with the given parameters...")
-            return True
+            return False
         else:
             print("Exiting the program.")
             exit(0)
@@ -249,8 +229,11 @@ def single_run_heston_volatility_vs_price():
             rho = float(input(f"Enter correlation between returns and variances under risk-neutral dynamics (typical range: -1 < rho < 1): "))
             sigma = float(input(f"Enter volatility of volatility (typical range: 0 < sigma < 1): "))
             
-            if error_handling(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r):
+            if heston_parameters_are_valid(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r):
+                print("")
+            else:
                 user_input = input("Bad input detected. 'c' = continue despite abnormal input. 'r' = retry with new input: ")
+
             if user_input.lower() == 'r':
                 print("")
             else:
