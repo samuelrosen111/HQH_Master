@@ -86,6 +86,7 @@ def illustrate_hawkes():
     plt.legend()
     plt.show()
 
+
 ################################################################################
 
 def plot_volatility_smile():
@@ -115,7 +116,7 @@ def plot_volatility_smile():
     # Display the plot
     plt.show()
 
-plot_volatility_smile()
+#plot_volatility_smile()
 
 ################################################################################ 1
 
@@ -167,8 +168,6 @@ def plot_q_hawkes():
     plt.legend(loc='upper right')
     plt.show()
 
-#plot_q_hawkes()
-
 ################################################################################ 2
 
 def simulate_queue_hawkes_process(base_intensity, excitation, decay_rate, num_events):
@@ -200,14 +199,20 @@ def plot_queue_hawkes_process():
 #plot_queue_hawkes_process()
 
 
-
 def main():
     print("Choose test")
-    print("1: 'illustrate_hawkes' with example values")
+    print("1: 'illustrate_hawkes()' with given example values")
+    print("2: 'plot_volatility_smile()' with given example values")
     user_choice = int(input("\n------> Choose test: "))
     if user_choice==1:
         illustrate_hawkes()
+    if user_choice==2:
+        plot_volatility_smile()
 
+main()
+
+
+#CLOWN IMPLEMENTATION DONT USE
 # Experiment
 
 def heston_characteristic_function(u, t, r, V0, theta, kappa, sigma, rho):
@@ -272,7 +277,7 @@ def COS_method(N, S, K, r, T, alpha, sigma, rho, kappa, theta, lambda_):
     
     return c
 
-def main():
+def main2():
     # HQH model parameters
     alpha = 0.1
     sigma = 0.3
