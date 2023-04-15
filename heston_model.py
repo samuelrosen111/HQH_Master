@@ -246,10 +246,26 @@ def heston_hawkes(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, h
     event_impact_on_volatility = 1.05
     event_impact_on_price = 1.05
 
-    # Calculate asset prices and variances over time, tqdm is used to display
+    current_event_index = 0
+    next_event_time = event_times[current_event_index] if event_times else None
+
     for i in tqdm(range(1, num_steps + 1), desc="Simulation progress", ncols=100):
+        current_time = i * dt
+
         stonk[i] = stonk[i - 1] * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
         volatility[i] = np.maximum(volatility[i - 1] + kappa * (theta - volatility[i - 1]) * dt + sigma * np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
+
+        # Check if an event occurred at the current time step
+        while next_event_time is not None and current_time >= next_event_time:
+            stonk[i] *= event_impact_on_price
+            volatility[i] *= event_impact_on_volatility
+            
+            current_event_index += 1
+            if current_event_index < len(event_times):
+                next_event_time = event_times[current_event_index]
+            else:
+                next_event_time = None
+
 
     return stonk, volatility
 
@@ -293,7 +309,7 @@ def single_run_heston_hawkes_volatility_vs_price():
         S0 = 100.0             # initial asset price (typical range: varies by asset)
         T = 10                # time horizon in years (typical range: 0 < T < 10)
         r = 0.02               # risk-free interest rate (typical range: 0 < r < 0.1)
-        num_steps = 2520       # number of time steps in simulation (typical range: 10 < num_steps < 1000)
+        num_steps = 1000       # number of time steps in simulation (typical range: 10 < num_steps < 1000)
         kappa = 3              # rate of mean reversion of variance under risk-neutral dynamics (typical range: 0 < kappa < 10)
         theta = 0.20**2        # long-term mean of variance under risk-neutral dynamics (typical range: 0 < theta < 1)
         v0 = 0.25**2           # initial variance under risk-neutral dynamics (typical range: 0 < v0 < 1)
@@ -314,11 +330,11 @@ def single_run_heston_hawkes_volatility_vs_price():
 
     # simulate asset prices and variances using the Heston model
     simulated_stock_price, simulated_volatility = heston_hawkes(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta)
-    correlation__coefficient_btw_volatility_price = calculate_correlation(simulated_stock_price, simulated_volatility)
+    correlation_coefficient_btw_volatility_price = calculate_correlation(simulated_stock_price, simulated_volatility)
 
     # plot asset prices and variances over time
     fig, ax1 = plt.subplots(figsize=(12,5))
-    ax1.set_title(f'Heston Model Asset Prices and Variance (in this run correlation was: {correlation__coefficient_btw_volatility_price:.2f})')
+    ax1.set_title(f'Heston Model Asset Prices and Variance (in this run correlation was: {correlation_coefficient_btw_volatility_price:.2f})')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Stock Price', color='r')
     ax1.plot(np.linspace(0,T,num_steps+1), simulated_stock_price, color='r')
@@ -329,7 +345,85 @@ def single_run_heston_hawkes_volatility_vs_price():
     ax2.tick_params(axis='y', labelcolor='b')
     plt.show()
 
-single_run_heston_hawkes_volatility_vs_price()
+def single_run_heston_hawkes_volatility_vs_price2():
+    num_sims = 1
+
+    hawkes_mu = 1
+    hawkes_alpha = 0.8
+    hawkes_beta = 1.5
+
+    auto = input("Do you want to enter your own parameter values? (y/n, default is 'n') ").lower()
+
+    if auto == "y":
+        while True:
+            S0 = float(input(f"Enter initial asset price (typical range: varies by asset): "))
+            T = float(input(f"Enter time horizon in years (typical range: 0 < T < 10): "))
+            r = float(input(f"Enter risk-free interest rate (typical range: 0 < r < 0.1): "))
+            num_steps = int(input(f"Enter number of time steps in simulation (typical range: 10 < num_steps < 1000): "))
+            kappa = float(input(f"Enter rate of mean reversion of variance under risk-neutral dynamics (typical range: 0 < kappa < 10): "))
+            theta = float(input(f"Enter long-term mean of variance under risk-neutral dynamics (typical range: 0 < theta < 1) (most typical value: {0.20**2:.2f}): "))
+            v0 = float(input(f"Enter initial variance under risk-neutral dynamics (typical range: 0 < v0 < 1): "))
+            rho = float(input(f"Enter correlation between returns and variances under risk-neutral dynamics (typical range: -1 < rho < 1): "))
+            sigma = float(input(f"Enter volatility of volatility (typical range: 0 < sigma < 1): "))
+            
+            if heston_parameters_are_valid(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r):
+                print("")
+            else:
+                user_input = input("Bad input detected. 'c' = continue despite abnormal input. 'r' = retry with new input: ")
+
+            if user_input.lower() == 'r':
+                print("")
+            else:
+                break
+    else:
+        # Use example Heston parameter values
+        S0 = 100.0             # initial asset price (typical range: varies by asset)
+        T = 10                # time horizon in years (typical range: 0 < T < 10)
+        r = 0.02               # risk-free interest rate (typical range: 0 < r < 0.1)
+        num_steps = 1000       # number of time steps in simulation (typical range: 10 < num_steps < 1000)
+        kappa = 3              # rate of mean reversion of variance under risk-neutral dynamics (typical range: 0 < kappa < 10)
+        theta = 0.20**2        # long-term mean of variance under risk-neutral dynamics (typical range: 0 < theta < 1)
+        v0 = 0.25**2           # initial variance under risk-neutral dynamics (typical range: 0 < v0 < 1)
+        rho = 0.7              # correlation between returns and variances under risk-neutral dynamics (typical range: -1 < rho < 1) "instantanious corelation" enligt erik btw W and W_s
+        sigma = 0.6            # volatility of volatility (typical range: 0 < sigma < 1)
+
+    simulated_stock_price, simulated_volatility = heston_hawkes(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta)
+    correlation__coefficient_btw_volatility_price = calculate_correlation(simulated_stock_price, simulated_volatility)
+
+    # Get the event times for plotting
+    event_times = hawkes_process(hawkes_mu, hawkes_alpha, hawkes_beta, T)
+
+    fig, ax1 = plt.subplots(figsize=(12,5))
+    ax1.set_title(f'Heston-Hawkes Model Asset Prices and Volatility (in this run correlation was: {correlation__coefficient_btw_volatility_price:.2f})')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Stock Price', color='r')
+    ax1.plot(np.linspace(0, T, num_steps + 1), simulated_stock_price, color='r')
+    ax1.tick_params(axis='y', labelcolor='r')
+
+    ax1.annotate(
+    '(Horizontal purple lines indicate an event occurring)',
+    xy=(0.5, -0.1),  # Adjust the y-coordinate for vertical alignment
+    xycoords='axes fraction',
+    fontsize=10,
+    color='purple',
+    ha='center',
+    va='top',
+    )
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Volatility', color='b')
+    ax2.plot(np.linspace(0, T, num_steps + 1), simulated_volatility, color='b')
+    ax2.tick_params(axis='y', labelcolor='b')
+
+    # Plot the event times as horizontal purple dotted lines
+    for event_time in event_times:
+        ax1.axvline(event_time, color='purple', linestyle=(0, (3, 3)))
+
+    plt.show()
+
+#single_run_heston_hawkes_volatility_vs_price()
+
+single_run_heston_hawkes_volatility_vs_price2()
 
 ################################################## Illustrative functions
 
