@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm  # pip install tqdm
 
-################################################## Tool functions
+################################################## Heston Model
 
 def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r):
     # Heston_model_MonteCarlo: Simulates asset prices and volatilities using the Heston model via Monte Carlo simulation
@@ -130,6 +130,225 @@ def heston_parameters_are_valid(S0=None, v0=None, rho=None, kappa=None, theta=No
             exit(0)
     else:
         return True
+
+
+################################################## Hawkes Process
+
+def exponential_excitation(t, alpha, beta):
+    """
+    Exponential excitation function.
+    
+    Parameters:
+    - t: time since the last event
+    - alpha: positive constant affecting the intensity of the excitation
+    - beta: positive constant affecting the decay rate of the excitation
+    
+    Returns:
+    - Excitation value at time t
+    """
+    return alpha * np.exp(-beta * t)
+
+def hawkes_process(mu, alpha, beta, T):
+    """
+    Simulate a Hawkes process with an exponential excitation function.
+    Parameters:
+    - mu: baseline intensity
+    - alpha: positive constant affecting the intensity of the excitation
+    - beta: positive constant affecting the decay rate of the excitation
+    - T: time period to simulate the process
+    Returns:
+    - events: list of event times
+    """
+    events = []
+    t = 0
+    
+    while t < T:
+        lambda_max = mu + alpha  # Upper bound on intensity (assuming exponential excitation)
+        t += -np.log(np.random.rand()) / lambda_max  # Generate inter-event time from an exponential distribution
+        
+        if t >= T:
+            break
+        
+        # Acceptance-rejection sampling
+        p = mu / lambda_max
+        if len(events) > 0:
+            p += exponential_excitation(t - events[-1], alpha, beta) / lambda_max
+        
+        if np.random.rand() < p:
+            events.append(t)
+    
+    return events
+
+################################################## Heston Model + Hawkes self excitation
+
+def heston_hawkes_simulation1(S0, K, r, T, rho, kappa, theta, sigma, v0, mu, alpha, beta, num_sims, num_steps):
+    """
+    Heston-Hawkes combined model simulation.
+    
+    Heston parameters:
+    - S0: initial stock price
+    - K: strike price of the option
+    - r: risk-free interest rate
+    - rho: correlation between the stock price and volatility processes
+    - kappa: mean reversion speed of the volatility process
+    - theta: long-term mean of the volatility process
+    - sigma: volatility of the volatility process
+    - v0: initial volatility
+    
+    Hawkes parameters:
+    - mu: baseline intensity for the Hawkes process
+    - alpha: positive constant affecting the intensity of the excitation in the Hawkes process
+    - beta: positive constant affecting the decay rate of the excitation in the Hawkes process
+    
+    Common parameters:
+    - num_simulations: number of Monte Carlo simulations to run
+    - num_steps: number of time steps in each simulation
+    - T: time to maturity of the option
+    
+    Returns:
+    None for now. This function will be expanded in the future.
+    """
+    hawkes_event_arrival_times = hawkes_process(mu, alpha, beta, T)
+
+
+    # Calculate time increment
+    dt = T/num_steps
+    
+    # Set initial drift and covariance matrix
+    drift_term = [0,0]
+    covariance_matrix = np.array([[1,rho], [rho,1]])
+    
+    # Create arrays to store asset prices and variances over time
+    stonk = np.full(shape=(num_steps+1,num_sims), fill_value=S0)
+    volatility = np.full(shape=(num_steps+1,num_sims), fill_value=v0)
+    
+    # Sample correlated brownian motions under risk-neutral measure
+    Z = np.random.multivariate_normal(drift_term, covariance_matrix, (num_steps,num_sims))
+
+    # Calculate asset prices and variances over time using Heston and taking Hawkes process into account, tqdm is used to display
+
+    event_vol_impact = 1.02 # This variable decides how an event affects volatility. For example here it's increased by 2 percent
+    event_price_impact = 0.98 # This variable decides how an event affects price. For example here it's decreased by 2 percent
+
+    for i in tqdm(range(1, num_steps + 1), desc="Simulation progress", ncols=100):
+        stonk[i] = stonk[i - 1] * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
+        volatility[i] = np.maximum(volatility[i - 1] + kappa * (theta - volatility[i - 1]) * dt + sigma * np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
+
+    return stonk, volatility
+
+def heston_hawkes_simulation(S0, K, r, T, rho, kappa, theta, sigma, v0, mu, alpha, beta, num_sims, num_steps):
+    """
+    Heston-Hawkes combined model simulation.
+    
+    Heston parameters:
+    - S0: initial stock price
+    - K: strike price of the option
+    - r: risk-free interest rate
+    - rho: correlation between the stock price and volatility processes
+    - kappa: mean reversion speed of the volatility process
+    - theta: long-term mean of the volatility process
+    - sigma: volatility of the volatility process
+    - v0: initial volatility
+    
+    Hawkes parameters:
+    - mu: baseline intensity for the Hawkes process
+    - alpha: positive constant affecting the intensity of the excitation in the Hawkes process
+    - beta: positive constant affecting the decay rate of the excitation in the Hawkes process
+    
+    Common parameters:
+    - num_sims: number of Monte Carlo simulations to run
+    - num_steps: number of time steps in each simulation
+    - T: time to maturity of the option
+    
+    Returns:
+    stonk: array of simulated stock prices
+    volatility: array of simulated volatilities
+    """
+    hawkes_event_arrival_times = hawkes_process(mu, alpha, beta, T)
+
+    # Calculate time increment
+    dt = T / num_steps
+
+    # Set initial drift and covariance matrix
+    drift_term = [0, 0]
+    covariance_matrix = np.array([[1, rho], [rho, 1]])
+
+    # Create arrays to store asset prices and variances over time
+    stonk = np.full(shape=(num_steps + 1, num_sims), fill_value=S0)
+    volatility = np.full(shape=(num_steps + 1, num_sims), fill_value=v0)
+
+    # Sample correlated brownian motions under risk-neutral measure
+    Z = np.random.multivariate_normal(drift_term, covariance_matrix, (num_steps, num_sims))
+
+    # Hawkes event impacts
+    event_vol_impact = 1.02
+    event_price_impact = 0.98
+
+    # Initialize the current event index
+    current_event_index = 0
+
+    for i in tqdm(range(1, num_steps + 1), desc="Simulation progress", ncols=100):
+        # Check if the current time step corresponds to a Hawkes event
+        event_time = hawkes_event_arrival_times[current_event_index] if current_event_index < len(hawkes_event_arrival_times) else None
+        event_occurred = False
+        if event_time is not None and event_time >= (i - 1) * dt and event_time < i * dt:
+            event_occurred = True
+            current_event_index += 1
+
+        # Update stock prices and volatility using Heston model and taking Hawkes events into account
+        if event_occurred:
+            stonk[i] = stonk[i - 1] * event_price_impact * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
+            volatility[i] = np.maximum(event_vol_impact * (volatility[i - 1] + kappa * (theta - volatility[i - 1]) * dt + sigma * np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 1]), 0)
+        else:
+            stonk[i] = stonk[i - 1] * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
+            volatility[i] = np.maximum(volatility[i - 1] + kappa * (theta - volatility[i - 1]) * dt + sigma * np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
+
+    return stonk, volatility
+
+def example_run_heston_hawkes_simulation():
+    # Heston parameters
+    S0 = 100          # initial stock price
+    r = 0.05          # risk-free interest rate
+    rho = -0.5        # correlation between the stock price and volatility processes
+    kappa = 2.0       # mean reversion speed of the volatility process
+    theta = 0.04      # long-term mean of the volatility process
+    sigma = 0.2       # volatility of the volatility process
+    v0 = 0.04         # initial volatility
+    K = 100           # strike price of the option (not used in the simulation, but required as input)
+    
+    # Hawkes parameters
+    mu = 0.1          # baseline intensity for the Hawkes process
+    alpha = 0.5       # positive constant affecting the intensity of the excitation in the Hawkes process
+    beta = 1.0        # positive constant affecting the decay rate of the excitation in the Hawkes process
+    
+    # Common parameters
+    T = 20             # time to maturity of the option
+    num_sims = 1      # number of Monte Carlo simulations to run
+    num_steps = 1000  # number of time steps in each simulation
+
+    # Run Heston-Hawkes simulation
+    stonk, volatility = heston_hawkes_simulation(S0, K, r, T, rho, kappa, theta, sigma, v0, mu, alpha, beta, num_sims, num_steps)
+    
+    # Get the time values for each time step
+    time_values = np.linspace(0, T, num_steps + 1)
+
+    # Plot the stock price, volatility, and event occurrences
+    plt.figure(figsize=(10, 6))
+    plt.plot(time_values, stonk[:, 0], color='red', label='Price')
+    plt.plot(time_values, volatility[:, 0], color='blue', label='Volatility')
+
+    # Plot Hawkes event occurrences as purple lines along the x-axis
+    hawkes_event_times = hawkes_process(mu, alpha, beta, T)
+    for event_time in hawkes_event_times:
+        plt.axvline(x=event_time, color='purple', linestyle='dashed', linewidth=1)
+
+    plt.xlabel("Time")
+    plt.ylabel("Price / Volatility")
+    plt.title("Heston-Hawkes Model Simulation")
+    plt.legend()
+    plt.show()
+
+example_run_heston_hawkes_simulation()
 
 ################################################## Illustrative functions
 
@@ -526,6 +745,67 @@ def illustrate_heston_Volatility():
     plt.legend()
     plt.show()
 
+def illustrate_hawkes():
+    """
+    Plot a Hawkes process with an exponential excitation function.
+    Parameters:
+    """
+    mu = 1 # baseline intensity
+    alpha = 0.8 # positive constant affecting the intensity of the excitation
+    beta = 1.5 # positive constant affecting the decay rate of the excitation
+    T = 10 #time period to simulate the process
+
+    events = hawkes_process(mu, alpha, beta, T)
+    event_times = np.array(events)
+    time = np.linspace(0, T, 1000)
+    intensity = mu + np.array([np.sum(exponential_excitation(t - event_times[event_times < t], alpha, beta)) for t in time])
+    
+    event_indices = [np.argmin(np.abs(time - et)) for et in event_times]
+
+
+    print("Printing out the plotted values:")
+    print("Time\tIntensity\tEvent")
+    for i, t_value in enumerate(time):
+        intensity_value = intensity[i]
+        event_value = "Event" if i in event_indices else ""
+        print(f"{t_value:.2f}\t{intensity_value:.2f}\t{event_value}")
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(time, intensity, label="Intensity")
+    plt.stem(event_times, [mu]*len(event_times), linefmt="C1-", markerfmt="C1o", basefmt="C1-", label="Events")
+    plt.xlabel("Time")
+    plt.ylabel("Intensity")
+    plt.title("Hawkes Process with Exponential Excitation")
+    plt.legend()
+    plt.show()
+
+def plot_volatility_smile():
+    # Simulate some example data for the volatility smile
+    strike_prices = np.linspace(50, 150, 100)
+    implied_volatility = (strike_prices - 100)**2 / 10000 + 0.1
+
+    # Plot the volatility smile
+    fig, ax = plt.subplots()
+    ax.plot(strike_prices, implied_volatility, label='Volatility Smile')
+    
+    # Add a red vertical line at the current asset price (100)
+    ax.axvline(x=100, color='r', linestyle='--', label='Current Asset Price')
+    ax.legend()
+
+    # Set the labels and title for the primary x-axis
+    ax.set_xlabel('Strike Price')
+    ax.set_ylabel('Implied Volatility')
+    ax.set_title('Volatility Smile')
+
+    # Create a secondary x-axis to show the delta between the current asset price and the strike price
+    ax2 = ax.twiny()
+    delta = strike_prices - 100
+    ax2.plot(delta, np.zeros_like(delta), alpha=0)  # Create an invisible plot to synchronize the two x-axes
+    ax2.set_xlabel('Delta from Current Asset Price')
+    
+    # Display the plot
+    plt.show()
+
 ################################################## Reference check
 
 def main():
@@ -537,6 +817,8 @@ def main():
     print("4: Plot heston_mc_number_of_timesteps_convergence")
     print("5: Plot heston_mc_number_of_simulations_convergence")
     print("6: Visualize Heston Volatility")
+    print("7: illustrate_hawkes() process of self-excitation")
+    print("8: plot_volatility_smile() With example values")
     user_choice = int(input("\n------> Choose test: "))
 
     if user_choice==1:
@@ -551,9 +833,13 @@ def main():
         heston_mc_number_of_simulations_convergence()
     if user_choice==6:
         illustrate_heston_Volatility()
+    if user_choice==7:
+        illustrate_hawkes()
+    if user_choice==8:
+        plot_volatility_smile()
     else:
         print("Invalid input")
 
     print("The end, thank you ang come again (y)")
 
-main()
+#main()

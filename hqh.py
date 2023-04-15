@@ -22,13 +22,11 @@ def exponential_excitation(t, alpha, beta):
 def hawkes_process(mu, alpha, beta, T):
     """
     Simulate a Hawkes process with an exponential excitation function.
-    
     Parameters:
     - mu: baseline intensity
     - alpha: positive constant affecting the intensity of the excitation
     - beta: positive constant affecting the decay rate of the excitation
     - T: time period to simulate the process
-    
     Returns:
     - events: list of event times
     """
@@ -85,7 +83,6 @@ def illustrate_hawkes():
     plt.title("Hawkes Process with Exponential Excitation")
     plt.legend()
     plt.show()
-
 
 ################################################################################
 
