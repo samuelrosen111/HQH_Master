@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import time
 from tqdm import tqdm  # pip install tqdm
 import pandas as pd
+from time import sleep as time_sleep
 
 def calculate_correlation(x, y):
     """
@@ -465,43 +466,239 @@ def heston_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
 
     return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts
 
-################################################## Q HAWKES
 
-def q_hawkes_process(mu, alpha, beta, T):
+################################################## HESTON QUEUE HAWKES
+
+
+def q_hawkes_process(mu, alpha, T, dt, lambda_param, max_intensity):
     """
-    Simulate a Q-Hawkes process.
+    Input parameters:
+    - mu: Baseline intensity
+    - alpha: Excitation constant affecting the intensity of the excitation
+    - T: Total runtime given in years. Should be an integer value.
+    - dt: Time step length. Should evenly divide T.
+    - lambda_param: Lambda parameter for the exponential distribution.
+    - max_intensity: Maximum intensity allowed. Stochastic removal of the queue depends on this parameter.
+
+    Output:
+    - intensities: List of intensities at each time step.
+    - event_times: List of event occurrence times.
+
+    Function steps:
+    1. Initialize the current_intensity, intensities, memory_kernel, and event_times lists.
+    2. Iterate through each time step and update the current intensity.
+    3. Check if an event occurs in the current time step and update the memory_kernel accordingly.
+    4. Update the duration of events and remove expired ones from the memory_kernel.
+    5. Check for stochastic memory loss and reset the memory_kernel if needed.
+    """
+
+    # Step 1: Initialize the current_intensity, intensities, memory_kernel, and event_times lists.
+    current_intensity = mu
+    intensities = []
+    memory_kernel = []
+    event_times = []
+    wipe_times = []
+
+    # Step 2: Iterate through each time step and update the current intensity.
+    for current_time in np.arange(0, float(T), dt):
+        
+        current_intensity = mu + alpha * len(memory_kernel)
+        intensities.append(current_intensity)
+
+        # Step 3: Check if an event occurs in the current time step and update the memory_kernel accordingly.
+        event_occured_this_time_step = np.random.rand() <= current_intensity
+        if event_occured_this_time_step:
+            event_times.append(current_time)
+            duration_time_for_this_event = np.random.exponential(scale=1 / lambda_param)
+            memory_kernel.append(duration_time_for_this_event)
+
+        # Step 4: Update the duration of events and remove expired ones from the memory_kernel.
+        for i in reversed(range(len(memory_kernel))):
+            memory_kernel[i] -= dt
+            if memory_kernel[i] <= 0:
+                del memory_kernel[i]
+
+        # Step 5: Check for stochastic memory loss and reset the memory_kernel if needed.
+        base_intensity = mu
+        wipe_probability = (current_intensity - base_intensity) / (max_intensity - base_intensity)
+        wipe_event_occured_this_time_step = (np.random.rand() < wipe_probability)
+        if wipe_event_occured_this_time_step:
+            wipe_times.append(current_time)
+            memory_kernel = []
+
+    return intensities, event_times, wipe_times
+
+def run_and_plot_q_hawkes():
+    mu = 0.1
+    alpha = 0.005
+    T = 10
+    dt = 0.01
+    lambda_param = 0.5
+    max_intensity = 1
+
+    intensities, event_times, wipe_times = q_hawkes_process(mu, alpha, T, dt, lambda_param, max_intensity)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(np.arange(0, float(T), dt), intensities, label='Intensity')
+    plt.scatter(event_times, [0]*len(event_times), color='orange', marker='o', label='Events')
+    
+    for wt in wipe_times:
+        plt.axvline(wt, color='purple', linestyle='--', alpha=0.7, label='Wipe Events' if wt == wipe_times[0] else None)
+    
+    plt.xlabel('Time')
+    plt.ylabel('Intensity')
+    plt.title('Q-Hawkes Process Simulation')
+    plt.legend(loc='upper right')
+    plt.show()
+
+def heston_queue_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact):
+    
+    """
+    Simulate asset prices and variance using the Heston model, incorporating event impacts from a Hawkes process with impact values drawn from two different normal distributions.
+
+    q_hawkes_process: Generates a Hawkes process with queueing events and memory wipe events.
+    generate_impacts_from_events: Generates price and volatility impacts from the event times.
+
     Parameters:
-    - mu: baseline intensity (lambda*)
-    - alpha: positive constant affecting the intensity of the excitation
-    - beta: positive constant affecting the decay rate of the excitation
-    - T: time period to simulate the process
+    - S0: initial asset price
+    - v0: initial variance
+    - rho: correlation between asset returns and variance
+    - kappa: rate of mean reversion in variance process
+    - theta: long-term mean of variance process
+    - sigma: volatility of volatility, degree of randomness in the variance process
+    - T: time of simulation in years
+    - num_steps: number of time steps
+    - num_sims: number of scenarios/simulations
+    - r: risk-free interest rate
+    - hawkes_mu: baseline intensity for Hawkes process
+    - hawkes_alpha: positive constant affecting the intensity of the excitation for Hawkes process
+    - hawkes_beta: positive constant affecting the decay rate of the excitation for Hawkes process
+    - mean_price_impact: mean of the normal distribution for price impacts
+    - std_price_impact: standard deviation of the normal distribution for price impacts
+    - mean_vol_impact: mean of the normal distribution for volatility impacts
+    - std_vol_impact: standard deviation of the normal distribution for volatility impacts
+
     Returns:
-    - events: list of event times
+    - asset_price: numpy array of asset prices over time (shape: (num_steps+1, num_sims))
+    - asset_volatility: numpy array of variances over time (shape: (num_steps+1, num_sims))
+    - event_times: list of event times from the Hawkes process
+    - price_impacts: list of price impacts corresponding to event times
+    - volatility_impacts: list of volatility impacts corresponding to event times
+    - wipe_times: list of memory wipe event times
+
+    Steps:
+    1. Generate a Hawkes process with queueing events and memory wipe events.
+    2. Generate price and volatility impacts from the event times.
+    3. Initialize asset price and volatility arrays.
+    4. Simulate asset prices and volatility for each time step and scenario, incorporating event impacts when necessary.
     """
-    events = []
-    t = 0
-    lambda_t = mu
-    n = 0
-    n_q = 0
+    # Step 1: Generate a Hawkes process with queueing events and memory wipe events.
+    qh_mu = 0.1
+    qh_alpha = 0.005
+    qh_dt = 0.01
+    qh_lambda_param = 0.5
+    qh_max_intensity = 1
+    intensities, event_times, wipe_times = q_hawkes_process(qh_mu, qh_alpha, T, qh_dt, qh_lambda_param, qh_max_intensity)
 
-    while t < T:
-        lambda_max = lambda_t + beta * (mu - lambda_t)
-        t += -np.log(np.random.rand()) / lambda_max  # Generate inter-event time from an exponential distribution
+    # Step 2: Generate price and volatility impacts from the event times.
+    price_impacts, volatility_impacts = generate_impacts_from_events(event_times, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
 
-        if t >= T:
-            break
+    # Step 3: Initialize asset price and volatility arrays.
+    dt = T/num_steps
+    drift_term = [0,0]
+    covariance_matrix = np.array([[1,rho], [rho,1]])
+    
+    asset_price = np.full(shape=(num_steps+1,num_sims), fill_value=S0)
+    asset_volatility = np.full(shape=(num_steps+1,num_sims), fill_value=v0)
+    
+    Z = np.random.multivariate_normal(drift_term, covariance_matrix, (num_steps,num_sims))
 
-        # Determine if event is a T or TQ jump time
-        U = np.random.rand()
-        if U <= lambda_t / (lambda_t + beta * (mu - lambda_t)):
-            n += 1
-            events.append(t)
-        else:
-            n_q += 1
+    current_event_index = 0
+    next_event_time = event_times[current_event_index] if event_times else None
+    
+    #4. Simulate asset prices and volatility for each time step and scenario, incorporating event impacts when necessary.
+    for i in tqdm(range(1, num_steps + 1), desc="Simulation progress", ncols=100):
+        current_time = i * dt
 
-        lambda_t = mu + alpha * (n - n_q)
+        asset_price[i] = asset_price[i - 1] * np.exp((r - 0.5 * asset_volatility[i - 1]) * dt + np.sqrt(asset_volatility[i - 1] * dt) * Z[i - 1, :, 0])
+        asset_volatility[i] = np.maximum(asset_volatility[i - 1] + kappa * (theta - asset_volatility[i - 1]) * dt + sigma * np.sqrt(asset_volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
 
-    return events
+        while next_event_time is not None and current_time >= next_event_time:
+            asset_price[i] *= price_impacts[current_event_index]
+            asset_volatility[i] *= volatility_impacts[current_event_index]
+            
+            current_event_index += 1
+            if current_event_index < len(event_times):
+                next_event_time = event_times[current_event_index]
+            else:
+                next_event_time = None
+
+    return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts, wipe_times
+
+def illustrate_heston_queue_hawkes_normal_mc():
+    # Use example parameter values
+    S0 = 100.0
+    v0 = 0.25**2
+    rho = 0.7
+    kappa = 3
+    theta = 0.20**2
+    sigma = 0.6
+    T = 20
+    num_steps = 1000
+    num_sims = 1
+    r = 0.02
+    hawkes_mu = 1
+    hawkes_alpha = 0.8
+    hawkes_beta = 1.5
+    mean_price_impact = 1.0
+    std_price_impact = 0.1
+    mean_vol_impact = 1.0
+    std_vol_impact = 0.1
+
+    asset_price, asset_volatility, event_times, price_impacts, volatility_impacts, wipe_times = heston_queue_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
+    
+    fig, ax1 = plt.subplots(figsize=(12, 5))
+    ax1.set_title('Heston-Queue-Hawkes-Normal Model Asset Prices and Volatility')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Stock Price', color='r')
+    ax1.plot(np.linspace(0, T, num_steps + 1), asset_price, color='r')
+    ax1.tick_params(axis='y', labelcolor='r')
+
+    ax1.annotate(
+        '(Horizontal purple lines indicate an event occurring)',
+        xy=(0.5, -0.1),
+        xycoords='axes fraction',
+        fontsize=10,
+        color='purple',
+        ha='center',
+        va='top',
+    )
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Volatility', color='b')
+    ax2.plot(np.linspace(0, T, num_steps + 1), asset_volatility, color='b')
+    ax2.tick_params(axis='y', labelcolor='b')
+
+    # Plot the event times as horizontal purple dotted lines
+    for event_time in event_times:
+        ax1.axvline(event_time, color='purple', linestyle=(0, (3, 3)))
+
+    plt.show()
+
+    # Print the mean and standard deviation of the normal distributions
+    print("\n\nAn impact of 1 would mean mutiplying the number by 1 and thus no impact. 1.1 woul mean increasing the value by 10 percent. \nFollowing are the impact values drawn from the normal distribution of both volatility and price: \n")
+    print(f"Mean Price Impact: {mean_price_impact:.2f}, Std Dev Price Impact: {std_price_impact:.2f}")
+    print(f"Mean Volatility Impact: {mean_vol_impact:.2f}, Std Dev Volatility Impact: {std_vol_impact:.2f}\n")
+
+    # Print the table header
+    print("Event Time\tPrice Impact (%)\tVolatility Impact (%)")
+
+    # Print the table rows
+    for event_time, price_impact, vol_impact in zip(event_times, price_impacts, volatility_impacts):
+        print(f"{event_time:.2f}\t\t{(price_impact - 1) * 100:.2f}\t\t\t{(vol_impact - 1) * 100:.2f}")
+
+    print("\n\n\n")
+
 
 
 ################################################## Illustrative functions
@@ -1100,6 +1297,8 @@ def main():
     print("8: plot_volatility_smile() With example values")
     print("9: plot_heston_hawkes_volatility_and_price")
     print("10: illustrate_heston_hawkes_normal_mc(). Example run showing Heston Hawkes with normal distributed price and vol impacts")
+    print("11: run_and_plot_q_hawkes(). Plots an example run of a Q-Hawkes process.")
+    print("12: illustrate_heston_queue_hawkes_normal_mc() Makes one example run of a HQH process and plots price vs Volatility and events")
     user_choice = int(input("\n------> Choose test: "))
 
     if user_choice==1:
@@ -1122,6 +1321,10 @@ def main():
         plot_heston_hawkes_volatility_and_price()
     if user_choice==10:
         illustrate_heston_hawkes_normal_mc()
+    if user_choice==11:
+        run_and_plot_q_hawkes()
+    if user_choice==12:
+        illustrate_heston_queue_hawkes_normal_mc()
     else:
         print("Invalid input")
 
