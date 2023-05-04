@@ -467,7 +467,7 @@ def heston_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
     return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts
 
 
-################################################## HESTON QUEUE HAWKES
+################################################## QUEUE HAWKES wipe
 
 
 def q_hawkes_process(mu, alpha, T, dt, lambda_param, max_intensity):
@@ -635,7 +635,7 @@ def heston_queue_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps
 
     return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts, wipe_times
 
-def illustrate_heston_queue_hawkes_normal_mc():
+def illustrate_heston_queue_hawkes_normal_mc_without_wipelines():
     # Use example parameter values
     S0 = 100.0
     v0 = 0.25**2
@@ -658,7 +658,7 @@ def illustrate_heston_queue_hawkes_normal_mc():
     asset_price, asset_volatility, event_times, price_impacts, volatility_impacts, wipe_times = heston_queue_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
     
     fig, ax1 = plt.subplots(figsize=(12, 5))
-    ax1.set_title('Heston-Queue-Hawkes-Normal Model Asset Prices and Volatility')
+    ax1.set_title('Heston-Queue-Hawkes Model: Asset Prices v.s. Volatility')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Stock Price', color='r')
     ax1.plot(np.linspace(0, T, num_steps + 1), asset_price, color='r')
@@ -699,6 +699,416 @@ def illustrate_heston_queue_hawkes_normal_mc():
 
     print("\n\n\n")
 
+def illustrate_heston_queue_hawkes_normal_mc():
+    # Use example parameter values
+    S0 = 100.0
+    v0 = 0.25**2
+    rho = 0.7
+    kappa = 3
+    theta = 0.20**2
+    sigma = 0.6
+    T = 20
+    num_steps = 1000
+    num_sims = 1
+    r = 0.02
+    hawkes_mu = 1
+    hawkes_alpha = 0.8
+    hawkes_beta = 1.5
+    mean_price_impact = 1.0
+    std_price_impact = 0.1
+    mean_vol_impact = 1.0
+    std_vol_impact = 0.1
+
+    asset_price, asset_volatility, event_times, price_impacts, volatility_impacts, wipe_times = heston_queue_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
+    
+    fig, ax1 = plt.subplots(figsize=(12, 5))
+    ax1.set_title('Heston-Queue-Hawkes Model: Asset Prices v.s. Volatility')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Stock Price', color='r')
+    ax1.plot(np.linspace(0, T, num_steps + 1), asset_price, color='r')
+    ax1.tick_params(axis='y', labelcolor='r')
+
+    ax1.annotate(
+        'Horizontal purple lines indicate an event occurring & Green lines indicate wipe events.',
+        xy=(0.5, -0.1),
+        xycoords='axes fraction',
+        fontsize=10,
+        color='purple',
+        ha='center',
+        va='top',
+    )
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Volatility', color='b')
+    ax2.plot(np.linspace(0, T, num_steps + 1), asset_volatility, color='b')
+    ax2.tick_params(axis='y', labelcolor='b')
+
+    # Plot the event times as horizontal purple dotted lines
+    for event_time in event_times:
+        ax1.axvline(event_time, color='purple', linestyle=(0, (3, 3)))
+
+    # Plot wipe events as solid green vertical lines
+    for wipe_time in wipe_times:
+        ax1.axvline(wipe_time, color='green', linestyle='solid')
+
+    plt.show()
+
+    # Print the mean and standard deviation of the normal distributions
+    print("\n\nAn impact of 1 would mean mutiplying the number by 1 and thus no impact. 1.1 woul mean increasing the value by 10 percent. \nFollowing are the impact values drawn from the normal distribution of both volatility and price: \n")
+    print(f"Mean Price Impact: {mean_price_impact:.2f}, Std Dev Price Impact: {std_price_impact:.2f}")
+    print(f"Mean Volatility Impact: {mean_vol_impact:.2f}, Std Dev Volatility Impact: {std_vol_impact:.2f}\n")
+
+     # Print the table header
+    print("Event Time\tPrice Impact (%)\tVolatility Impact (%)")
+
+    # Print the table rows
+    for event_time, price_impact, vol_impact in zip(event_times, price_impacts, volatility_impacts):
+        print(f"{event_time:.2f}\t\t{(price_impact - 1) * 100:.2f}\t\t\t{(vol_impact - 1) * 100:.2f}")
+
+    print("\n\n\n")
+
+################################################## QUEUE HAWKES Samuel 2.0
+
+
+def q_hawkes_process2(mu, alpha, beta, T, dt, lambda_param, max_intensity):
+    """
+    Input parameters:
+    - mu: Baseline intensity
+    - alpha: Excitation constant affecting the intensity of the excitation
+    - beta: expirations rate determining speed with which memory of past events is stochastically forgotten
+    - T: Total runtime given in years. Should be an integer value.
+    - dt: Time step length. Should evenly divide T.
+    - lambda_param: Lambda parameter for the exponential distribution.
+    - max_intensity: Maximum intensity allowed. Stochastic removal of the queue depends on this parameter.
+
+    Output:
+    - intensities: List of intensities at each time step.
+    - event_times: List of event occurrence times.
+
+    Function steps:
+    1. Initialize the current_intensity, intensities, memory_kernel, and event_times lists.
+    2. Iterate through each time step and update the current intensity.
+    3. Check if an event occurs in the current time step and update the memory_kernel accordingly.
+    4. Update the duration of events and remove expired ones from the memory_kernel.
+    5. Check for stochastic memory loss and reset the memory_kernel if needed.
+    """
+
+    # Step 1: Initialize the current_intensity, intensities, memory_kernel, and event_times lists.
+    current_intensity = mu
+    intensities = []
+    memory_kernel = []
+    event_times = []
+    stochastic_memory_loss_times = []
+
+    # Step 2: Iterate through each time step and update the current intensity.
+    for current_time in np.arange(0, float(T), dt):
+        
+        current_intensity = mu + alpha * len(memory_kernel)
+        intensities.append(current_intensity)
+
+        # Step 3: Check if an event occurs in the current time step and update the memory_kernel accordingly.
+        event_occured_this_time_step = np.random.rand() <= current_intensity
+        if event_occured_this_time_step:
+            event_times.append(current_time)
+            duration_time_for_this_event = np.random.exponential(scale=1 / lambda_param)
+            memory_kernel.append(duration_time_for_this_event)
+
+        # Step 4: Update the duration of events and remove expired ones from the memory_kernel.
+        for i in reversed(range(len(memory_kernel))):
+            memory_kernel[i] -= dt
+            if memory_kernel[i] <= 0:
+                del memory_kernel[i]
+
+        # Step 5: Check for stochastic memory loss - potentially decreasing the memory_kernel
+        base_intensity = mu
+        probability_stochastic_memory_loss = (current_intensity - base_intensity) / (max_intensity - base_intensity)
+        wipe_event_occured_this_time_step = (np.random.rand() < probability_stochastic_memory_loss)
+        if wipe_event_occured_this_time_step:
+            stochastic_memory_loss_times.append(current_time)
+            for i in range(0,len(memory_kernel)):
+                memory_kernel[i] *= beta
+
+    return intensities, event_times, stochastic_memory_loss_times
+
+def run_and_plot_q_hawkes2():
+    mu = 0.1
+    alpha = 0.005
+    beta = 0.9
+    T = 10
+    dt = 0.01
+    lambda_param = 0.5
+    max_intensity = 0.3
+
+    intensities, event_times, wipe_times = q_hawkes_process2(mu, alpha, beta, T, dt, lambda_param, max_intensity)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(np.arange(0, float(T), dt), intensities, label='Intensity')
+
+    # Scatter plot with event intensities
+    wipe_intensities = [intensities[np.where(np.arange(0, float(T), dt) == wt)[0][0]] for wt in wipe_times]
+    plt.scatter(wipe_times, wipe_intensities, color='purple', marker='x', label='Wipe Events', zorder=3, alpha=0.7)
+
+    # Event markers on the intensity curve
+    plt.scatter(event_times, [0]*len(event_times), color='orange', marker='o', label='Events')
+
+    # Plot baseline intensity (mu) as a horizontal line
+    plt.axhline(mu, color='green', linestyle='--', label='Baseline Intensity (mu)')
+
+    # Calculate and plot average intensity for the full run
+    avg_intensity = sum(intensities) / len(intensities)
+    plt.axhline(avg_intensity, color='red', linestyle='--', label='Average Intensity')
+
+    plt.xlabel('Time')
+    plt.ylabel('Intensity')
+    plt.title('Q-Hawkes Process Simulation')
+    plt.legend(loc='upper right')
+    plt.show()
+
+################################################## QUEUE HAWKES Osterlee
+
+def q_hawkes_process_osterlee(mu, alpha, beta, T, dt):
+    """
+    Input parameters:
+    - mu: Baseline intensity in the paper mu i described as lambda^*
+    - alpha: Excitation constant affecting the intensity of the excitation
+    - beta: expirations rate determining speed with which memory of past events is stochastically forgotten
+    - T: Total runtime given in years. (Should be an integer value.)
+    - dt: Time step length. Should evenly divide T.
+
+    Output:
+    - event_times: List of event occurrence times.
+    - memory_loss_times: List of memory loss occurrence times.
+    - event_intensities: List of intensities at each time step for events.
+    - memory_loss_intensities: List of intensities at each time step for stochastic memory loss.
+    
+
+
+    # Step 1: Initialize and explain variables used in the function
+    # Step 2: Iterate through each time step and update the two affine proccesses
+    # Step 2.1 Check if event did occur, if so - increase intensity
+    # Step 2.2 Check if stochastic memory loss should eb applied
+
+    """
+
+    #1 Initialize and explain variables used in the function
+    Q = 0 # Activation number. A higher activity number means higher likelyhood of self excitation but also of stochastic memory loss
+
+    event_intensities = []  # likelyhood (or intensity) of events happening throughout the simulation.                     (This is not used for any calculations but only for illustrative purposes.)
+    memory_loss_intensities = [] # likelyhood (or intensity) of stochastic memory loss happening throughout the simulation.     (This is not used for any calculations but only for illustrative purposes.)
+    
+    event_times = []            # Memory kernel of events which have occured
+    memory_loss_times = []      # Memory kernel of when NTQ have jumped and thus erased memory stochastically
+
+    # Step 2: Iterate through each time step and update the two affine proccesses
+    for current_time in np.arange(0, float(T), dt):
+        # Step 2.1 Check if event occured
+        current_event_intensity = mu + alpha * Q # Current intensity (or likelyhood) of an event occuring
+        event_intensities.append(current_event_intensity)
+        if(current_event_intensity >= np.random.rand()):
+            Q += 1 #increase the activation number by 1
+            event_times.append(current_time)
+        
+        # Step 2.2 Checks is stochastic memory loss should be applied
+        current_stochastic_memory_loss_intensity = beta*Q  # Current stochastic probability of memory loss
+        memory_loss_intensities.append(current_stochastic_memory_loss_intensity)
+        if(current_stochastic_memory_loss_intensity >= np.random.rand()): # checks if N_t^Q jumps - if so then implement stochastic memory loss by decreasing activation number Q
+            Q -= 1 #Decrease the activation number by 1
+            memory_loss_times.append(current_time)
+
+    return event_times, memory_loss_times, event_intensities, memory_loss_intensities
+
+
+
+
+    """
+    Input parameters:
+    - mu: Baseline intensity (λ*)
+    - alpha: Excitation constant affecting the intensity of the excitation
+    - beta: Expirations rate determining speed with which memory of past events is stochastically forgotten
+    - T: Total runtime given in years. Should be an integer value.
+    - dt: Time step length. Should evenly divide T.
+    - lambda_param: Lambda parameter for the exponential distribution.
+    - max_intensity: Maximum intensity allowed. Stochastic removal of the queue depends on this parameter.
+
+    Output:
+    - intensities: List of intensities at each time step.
+    - event_times: List of event occurrence times.
+    - stochastic_memory_loss_times: List of times when stochastic memory loss occurs.
+    """
+
+    # Step 1: Initialize the current_intensity, intensities, memory_kernel, and event_times lists.
+    Q_t = 0 # Activation number
+    intensities = []
+    event_times = []
+    stochastic_memory_loss_times = []
+
+    # Initialize memory kernels for N_t and N_tQ
+    N_t = [] # First memory kernel analogous to the Hawkes Counting process
+    N_tQ = [] # Second (stochastic) memory kernel 
+
+    # Step 2: Iterate through each time step and update the current intensity.
+    for current_time in np.arange(0, float(T), dt):
+        
+        # Calculate current_intensity using Q_t
+        current_intensity = mu + alpha * Q_t
+        intensities.append(current_intensity)
+
+        # Step 3: Check if an event occurs in the current time step and update the memory_kernel accordingly.
+        event_occured_this_time_step = np.random.rand() <= current_intensity * dt
+        if event_occured_this_time_step:
+            event_times.append(current_time)
+            Q_t += 1 # Increment activation number when an event occurs
+
+        # Step 4: Update the duration of events in N_tQ and remove expired ones.
+        for i in reversed(range(len(N_tQ))):
+            N_tQ[i] -= dt
+            if N_tQ[i] <= 0:
+                del N_tQ[i]
+                Q_t -= 1 # Decrement activation number when an event's memory is erased
+
+        # Step 5: Check for stochastic memory loss and update N_tQ if needed.
+        wipe_probability = (current_intensity - mu) / (max_intensity - mu)
+        wipe_event_occured_this_time_step = (np.random.rand() < wipe_probability * dt)
+        if wipe_event_occured_this_time_step:
+            stochastic_memory_loss_times.append(current_time)
+            N_tQ.append(np.random.exponential(scale=1 / beta)) # Add a new event to N_tQ with an exponentially-distributed duration
+
+    return intensities, event_times, stochastic_memory_loss_times
+
+def plot_q_hawkes_process_osterlee():
+    # 1) Declare example input values internally in the function
+    mu = 0.1        # Baseline intensity
+    alpha = 0.2     # Jump size of intensity when an event occurs
+    beta = 0.2      # Decay rate
+    T = 1          # Total run-time
+    dt = 0.001       # time-step length
+
+    # 2) Call "q_hawkes_process_osterlee(mu, alpha, beta, T, dt)" to retrieve values from an example run
+    event_times, memory_loss_times, event_intensities, memory_loss_intensities = q_hawkes_process_osterlee(mu, alpha, beta, T, dt)
+
+    # 3) Make a graph containing two charts one above and the other below
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 6))
+    
+    # 3.1) Graph of Events (plotted as blue crosses) and event intensities (plotted as a blue line)
+    ax1.scatter(event_times, [mu]*len(event_times), color='blue', marker='x', alpha=0.6, label='Events')
+    ax1.plot(np.arange(0, float(T), dt), np.array(event_intensities) / (mu + alpha), color='blue', label='Event Intensities')
+    ax1.set_ylabel('Normalized Intensity')
+    ax1.legend()
+
+    # 3.2) Graph of stochastic memory loss times (plotted as red crosses) and memory loss intensity as a red line
+    ax2.scatter(memory_loss_times, [beta]*len(memory_loss_times), color='red', marker='x', alpha=0.6, label='Memory Loss Times (N_t^Q jumps)')
+    ax2.plot(np.arange(0, float(T), dt), np.array(memory_loss_intensities) / (beta * (mu + alpha)), color='red', label='Memory Loss Intensities')
+    ax2.set_xlabel('Time')
+    ax2.set_ylabel('Normalized Intensity')
+    ax2.legend()
+
+    num_rows = 100
+    print("Event Times    Event Intensity    Memory Loss Times    Memory Loss Intensity")
+    for i in range(min(num_rows, len(event_times), len(event_intensities), len(memory_loss_times), len(memory_loss_intensities))):
+        print(f"{event_times[i]:.5f}          {event_intensities[i]:.5f}          {memory_loss_times[i]:.5f}                {memory_loss_intensities[i]:.5f}")
+
+    plt.tight_layout()
+    plt.show()
+
+# Call the function to create the plot
+plot_q_hawkes_process_osterlee()
+
+################################################## HESTON QUEUE HAWKES OPTION
+
+
+def hqh_option(S0, K, r, T, option_type, num_simulations, num_steps=252,
+               rho=0.0, kappa=0.1, theta=0.2, sigma=0.5,
+               hawkes_mu=0.1, hawkes_alpha=0.005, hawkes_beta=0.5,
+               mean_price_impact=0.0, std_price_impact=1.0,
+               mean_vol_impact=0.0, std_vol_impact=1.0):
+    """
+    Estimates the price of a European call or put option using Monte Carlo simulation with the HQH model
+
+    Parameters:
+    S0 (float): the current stock price
+    K (float): the strike price
+    r (float): the risk-free interest rate
+    T (float): the time to maturity in years
+    option_type (str): either "call" or "put" to specify the type of option
+
+    num_simulations (int): the number of simulations to run
+    num_steps (int): the number of time steps to use in the simulation
+    rho (float): correlation between asset returns and variance in the HQH model
+    kappa (float): rate of mean reversion in variance process in the HQH model
+    theta (float): long-term mean of variance process in the HQH model
+    sigma (float): volatility of volatility, degree of randomness in the variance process in the HQH model
+    hawkes_mu (float): baseline intensity for Hawkes process in the HQH model
+    hawkes_alpha (float): positive constant affecting the intensity of the excitation for Hawkes process in the HQH model
+    hawkes_beta (float): positive constant affecting the decay rate of the excitation for Hawkes process in the HQH model
+    mean_price_impact (float): mean of the normal distribution for price impacts in the HQH model
+    std_price_impact (float): standard deviation of the normal distribution for price impacts in the HQH model
+    mean_vol_impact (float): mean of the normal distribution for volatility impacts in the HQH model
+    std_vol_impact (float): standard deviation of the normal distribution for volatility impacts in the HQH model
+
+    Returns:
+    float: the estimated price of the European call or put option
+    """
+    # Simulate the HQH model
+    asset_price, _, _, _, _, _ = heston_queue_hawkes_normal_mc(S0, theta, rho, kappa, theta, sigma, T, num_steps, num_simulations, r,
+                                                hawkes_mu, hawkes_alpha, hawkes_beta,
+                                                mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
+    
+        # Calculate the payoff for each scenario at maturity
+    if option_type == "call":
+        payoff = np.maximum(asset_price[-1] - K, 0)
+    elif option_type == "put":
+        payoff = np.maximum(K - asset_price[-1], 0)
+    else:
+        raise ValueError("Invalid option type, must be 'call' or 'put'")
+    
+    # Calculate the discounted expected payoff
+    discount_factor = math.exp(-r * T)
+    option_price = discount_factor * np.mean(payoff)
+    
+    return option_price
+
+
+def hqh_option_illustration():
+    # Declare example values for parameters
+    S0 = 100
+    r = 0.03
+    T = 1
+    num_simulations = 1000
+    num_steps = 252
+    option_type = "call"
+
+    # Generate an array of strike prices and time to maturity values
+    strike_prices = np.linspace(80, 120, 20)
+    times_to_maturity = np.linspace(0.1, 2, 20)
+
+    # Calculate option prices for different strike prices
+    option_prices_strike = [hqh_option(S0, K, r, T, option_type, num_simulations, num_steps) for K in strike_prices]
+
+    # Calculate option prices for different time to maturity values
+    option_prices_time = [hqh_option(S0, 100, r, t, option_type, num_simulations, num_steps) for t in times_to_maturity]
+
+    # Create the plots
+    plt.figure(figsize=(12, 5))
+
+    # Plot option prices for different strike prices
+    plt.subplot(1, 2, 1)
+    plt.plot(strike_prices, option_prices_strike)
+    plt.xlabel("Strike Price")
+    plt.ylabel("Option Price")
+    plt.title("HQH Option Prices for Different Strike Prices")
+
+    # Plot option prices for different time to maturity values
+    plt.subplot(1, 2, 2)
+    plt.plot(times_to_maturity, option_prices_time)
+    plt.xlabel("Time to Maturity (Years)")
+    plt.ylabel("Option Price")
+    plt.title("HQH Option Prices for Different Time to Maturity Values")
+
+    plt.tight_layout()
+    plt.show()
+
+
+#hqh_option_illustration()
 
 
 ################################################## Illustrative functions
@@ -1280,9 +1690,7 @@ def illustrate_heston_hawkes_normal_mc():
 
 
 
-# Call the function to plot
-#plot_heston_hawkes_normal_volatility_and_price()
-################################################## Reference check
+
 
 def main():
     # Main: The main function that executes the program and calls the appropriate functions based on user input
@@ -1330,4 +1738,4 @@ def main():
 
     print("\n\nEnd of main program.")
 
-main()
+#main()
