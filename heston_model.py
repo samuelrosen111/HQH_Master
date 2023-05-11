@@ -60,7 +60,7 @@ def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
     covariance_matrix = np.array([[1,rho], [rho,1]])
     
     # Create arrays to store asset prices and variances over time
-    stonk = np.full(shape=(num_steps+1,num_sims), fill_value=S0)
+    asset_price = np.full(shape=(num_steps+1,num_sims), fill_value=S0)
     volatility = np.full(shape=(num_steps+1,num_sims), fill_value=v0)
     
     # Sample correlated brownian motions under risk-neutral measure
@@ -68,10 +68,10 @@ def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
     
     # Calculate asset prices and variances over time, tqdm is used to display
     for i in tqdm(range(1, num_steps + 1), desc="Simulation progress", ncols=100):
-        stonk[i] = stonk[i - 1] * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
+        asset_price[i] = asset_price[i - 1] * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
         volatility[i] = np.maximum(volatility[i - 1] + kappa * (theta - volatility[i - 1]) * dt + sigma * np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
 
-    return stonk, volatility
+    return asset_price, volatility
 
 def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, option_type, K): 
     # Heston_option: Calculates European option prices using the Heston model and Monte Carlo simulation
@@ -185,12 +185,9 @@ def hawkes_process(mu, alpha, beta, T):
     events = []
     t = 0
     
-    while t < T:
+    while t <= T:
         lambda_max = mu + alpha  # Upper bound on intensity (assuming exponential excitation)
         t += -np.log(np.random.rand()) / lambda_max  # Generate inter-event time from an exponential distribution
-        
-        if t >= T:
-            break
         
         # Acceptance-rejection sampling
         p = mu / lambda_max
@@ -551,6 +548,7 @@ def run_and_plot_q_hawkes():
     plt.legend(loc='upper right')
     plt.show()
 
+
 def heston_queue_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact):
     
     """
@@ -770,7 +768,7 @@ def illustrate_heston_queue_hawkes_normal_mc():
 ################################################## QUEUE HAWKES Samuel 2.0
 
 
-def q_hawkes_process2(mu, alpha, beta, T, dt, lambda_param, max_intensity):
+def q_hawkes_process_dampening(mu, alpha, beta, T, dt, lambda_param, max_intensity):
     """
     Input parameters:
     - mu: Baseline intensity
@@ -839,7 +837,7 @@ def run_and_plot_q_hawkes2():
     lambda_param = 0.5
     max_intensity = 0.3
 
-    intensities, event_times, wipe_times = q_hawkes_process2(mu, alpha, beta, T, dt, lambda_param, max_intensity)
+    intensities, event_times, wipe_times = q_hawkes_process_dampening(mu, alpha, beta, T, dt, lambda_param, max_intensity)
 
     plt.figure(figsize=(12, 6))
     plt.plot(np.arange(0, float(T), dt), intensities, label='Intensity')
@@ -864,154 +862,184 @@ def run_and_plot_q_hawkes2():
     plt.legend(loc='upper right')
     plt.show()
 
-################################################## QUEUE HAWKES Osterlee
+################################################## HESTON QUEUE HAWKES Osterlee
 
 def q_hawkes_process_osterlee(mu, alpha, beta, T, dt):
     """
-    Input parameters:
-    - mu: Baseline intensity in the paper mu i described as lambda^*
-    - alpha: Excitation constant affecting the intensity of the excitation
-    - beta: expirations rate determining speed with which memory of past events is stochastically forgotten
-    - T: Total runtime given in years. (Should be an integer value.)
-    - dt: Time step length. Should evenly divide T.
+    Simulates the Q-Hawkes process.
 
-    Output:
-    - event_times: List of event occurrence times.
-    - memory_loss_times: List of memory loss occurrence times.
-    - event_intensities: List of intensities at each time step for events.
-    - memory_loss_intensities: List of intensities at each time step for stochastic memory loss.
-    
+    Parameters:
+    - mu (float): Baseline intensity (lambda^* in the paper).
+    - alpha (float): Excitation constant affecting the intensity of the excitation.
+    - beta (float): Expiration rate determining speed with which memory of past events is stochastically forgotten.
+    - T (int): Total runtime given in years.
+    - dt (float): Time step length. Should evenly divide T.
 
-
-    # Step 1: Initialize and explain variables used in the function
-    # Step 2: Iterate through each time step and update the two affine proccesses
-    # Step 2.1 Check if event did occur, if so - increase intensity
-    # Step 2.2 Check if stochastic memory loss should eb applied
-
+    Returns:
+    - event_times (list): List of event occurrence times.
+    - memory_loss_times (list): List of memory loss occurrence times.
+    - event_intensities (list): List of intensities at each time step for events.
+    - memory_loss_intensities (list): List of intensities at each time step for stochastic memory loss.
+    - Q_values (list): List of activation numbers at each time step.
     """
 
-    #1 Initialize and explain variables used in the function
-    Q = 0 # Activation number. A higher activity number means higher likelyhood of self excitation but also of stochastic memory loss
+    # Initialize variables
+    Q = 0  # Activation number, higher values increase likelihood of self-excitation and stochastic memory loss
+    event_intensities = []  # Likelihood of events happening throughout the simulation (for visualization purposes only)
+    memory_loss_intensities = []  # Likelihood of stochastic memory loss happening throughout the simulation (for visualization purposes only)
+    event_times = []  # Memory kernel of occurred events
+    memory_loss_times = []  # Memory kernel of memory loss occurrences
+    Q_values = []
 
-    event_intensities = []  # likelyhood (or intensity) of events happening throughout the simulation.                     (This is not used for any calculations but only for illustrative purposes.)
-    memory_loss_intensities = [] # likelyhood (or intensity) of stochastic memory loss happening throughout the simulation.     (This is not used for any calculations but only for illustrative purposes.)
-    
-    event_times = []            # Memory kernel of events which have occured
-    memory_loss_times = []      # Memory kernel of when NTQ have jumped and thus erased memory stochastically
-
-    # Step 2: Iterate through each time step and update the two affine proccesses
+    # Iterate through each time step and update the two affine processes
     for current_time in np.arange(0, float(T), dt):
-        # Step 2.1 Check if event occured
-        current_event_intensity = mu + alpha * Q # Current intensity (or likelyhood) of an event occuring
+        # Check if event occurred
+        current_event_intensity = mu + alpha * Q  # Current intensity (likelihood) of an event occurring
         event_intensities.append(current_event_intensity)
-        if(current_event_intensity >= np.random.rand()):
-            Q += 1 #increase the activation number by 1
+        if current_event_intensity >= np.random.rand():  # If event occurs
+            Q += 1  # Increase the activation number by 1
             event_times.append(current_time)
-        
-        # Step 2.2 Checks is stochastic memory loss should be applied
-        current_stochastic_memory_loss_intensity = beta*Q  # Current stochastic probability of memory loss
+
+        # Check if stochastic memory loss should be applied
+        current_stochastic_memory_loss_intensity = beta * Q  # Current stochastic probability of memory loss
         memory_loss_intensities.append(current_stochastic_memory_loss_intensity)
-        if(current_stochastic_memory_loss_intensity >= np.random.rand()): # checks if N_t^Q jumps - if so then implement stochastic memory loss by decreasing activation number Q
-            Q -= 1 #Decrease the activation number by 1
+        if current_stochastic_memory_loss_intensity >= np.random.rand():  # Check if N_t^Q jumps, if so, apply stochastic memory loss
+            Q -= 1  # Decrease the activation number by 1
             memory_loss_times.append(current_time)
+        Q_values.append(Q)
 
-    return event_times, memory_loss_times, event_intensities, memory_loss_intensities
-
-
-
-
-    """
-    Input parameters:
-    - mu: Baseline intensity (λ*)
-    - alpha: Excitation constant affecting the intensity of the excitation
-    - beta: Expirations rate determining speed with which memory of past events is stochastically forgotten
-    - T: Total runtime given in years. Should be an integer value.
-    - dt: Time step length. Should evenly divide T.
-    - lambda_param: Lambda parameter for the exponential distribution.
-    - max_intensity: Maximum intensity allowed. Stochastic removal of the queue depends on this parameter.
-
-    Output:
-    - intensities: List of intensities at each time step.
-    - event_times: List of event occurrence times.
-    - stochastic_memory_loss_times: List of times when stochastic memory loss occurs.
-    """
-
-    # Step 1: Initialize the current_intensity, intensities, memory_kernel, and event_times lists.
-    Q_t = 0 # Activation number
-    intensities = []
-    event_times = []
-    stochastic_memory_loss_times = []
-
-    # Initialize memory kernels for N_t and N_tQ
-    N_t = [] # First memory kernel analogous to the Hawkes Counting process
-    N_tQ = [] # Second (stochastic) memory kernel 
-
-    # Step 2: Iterate through each time step and update the current intensity.
-    for current_time in np.arange(0, float(T), dt):
-        
-        # Calculate current_intensity using Q_t
-        current_intensity = mu + alpha * Q_t
-        intensities.append(current_intensity)
-
-        # Step 3: Check if an event occurs in the current time step and update the memory_kernel accordingly.
-        event_occured_this_time_step = np.random.rand() <= current_intensity * dt
-        if event_occured_this_time_step:
-            event_times.append(current_time)
-            Q_t += 1 # Increment activation number when an event occurs
-
-        # Step 4: Update the duration of events in N_tQ and remove expired ones.
-        for i in reversed(range(len(N_tQ))):
-            N_tQ[i] -= dt
-            if N_tQ[i] <= 0:
-                del N_tQ[i]
-                Q_t -= 1 # Decrement activation number when an event's memory is erased
-
-        # Step 5: Check for stochastic memory loss and update N_tQ if needed.
-        wipe_probability = (current_intensity - mu) / (max_intensity - mu)
-        wipe_event_occured_this_time_step = (np.random.rand() < wipe_probability * dt)
-        if wipe_event_occured_this_time_step:
-            stochastic_memory_loss_times.append(current_time)
-            N_tQ.append(np.random.exponential(scale=1 / beta)) # Add a new event to N_tQ with an exponentially-distributed duration
-
-    return intensities, event_times, stochastic_memory_loss_times
+    return event_times, memory_loss_times, event_intensities, memory_loss_intensities, Q_values
 
 def plot_q_hawkes_process_osterlee():
-    # 1) Declare example input values internally in the function
-    mu = 0.1        # Baseline intensity
-    alpha = 0.2     # Jump size of intensity when an event occurs
-    beta = 0.2      # Decay rate
-    T = 1          # Total run-time
-    dt = 0.001       # time-step length
+    """
+    Simulates and plots the Q-Hawkes process with pre-defined parameters.
 
-    # 2) Call "q_hawkes_process_osterlee(mu, alpha, beta, T, dt)" to retrieve values from an example run
-    event_times, memory_loss_times, event_intensities, memory_loss_intensities = q_hawkes_process_osterlee(mu, alpha, beta, T, dt)
+    No input required. 
+    """
+    # Example parameters (change these to suit your needs)
+    mu = 0.2  # Baseline intensity (lambda^* in the paper). Typical values might range from 0 to 1.
+    alpha = 0.5  # Excitation constant affecting the intensity of the excitation. Typical values might range from 0 to 1.
+    beta = 0.6  # Expiration rate determining speed with which memory of past events is stochastically forgotten. Typical values might range from 0 to 1.
+    T = 1  # Total runtime given in years. Typical values might range from 1 to 10.
+    dt = 0.01  # Time step length. Should evenly divide T. Typical values might be 0.01 or 0.001.
 
-    # 3) Make a graph containing two charts one above and the other below
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 6))
-    
-    # 3.1) Graph of Events (plotted as blue crosses) and event intensities (plotted as a blue line)
-    ax1.scatter(event_times, [mu]*len(event_times), color='blue', marker='x', alpha=0.6, label='Events')
-    ax1.plot(np.arange(0, float(T), dt), np.array(event_intensities) / (mu + alpha), color='blue', label='Event Intensities')
-    ax1.set_ylabel('Normalized Intensity')
-    ax1.legend()
+    event_times, memory_loss_times, event_intensities, memory_loss_intensities, Q_values = q_hawkes_process_osterlee(mu, alpha, beta, T, dt)
 
-    # 3.2) Graph of stochastic memory loss times (plotted as red crosses) and memory loss intensity as a red line
-    ax2.scatter(memory_loss_times, [beta]*len(memory_loss_times), color='red', marker='x', alpha=0.6, label='Memory Loss Times (N_t^Q jumps)')
-    ax2.plot(np.arange(0, float(T), dt), np.array(memory_loss_intensities) / (beta * (mu + alpha)), color='red', label='Memory Loss Intensities')
-    ax2.set_xlabel('Time')
-    ax2.set_ylabel('Normalized Intensity')
-    ax2.legend()
+    # Create time array for x-axis
+    time_array = np.arange(0, float(T), dt)
 
-    num_rows = 100
-    print("Event Times    Event Intensity    Memory Loss Times    Memory Loss Intensity")
-    for i in range(min(num_rows, len(event_times), len(event_intensities), len(memory_loss_times), len(memory_loss_intensities))):
-        print(f"{event_times[i]:.5f}          {event_intensities[i]:.5f}          {memory_loss_times[i]:.5f}                {memory_loss_intensities[i]:.5f}")
+    # Create figure and axes
+    fig, axs = plt.subplots(2, sharex=True)
 
-    plt.tight_layout()
+    # Plot event and memory loss intensities
+    axs[0].plot(time_array, event_intensities, color='blue', label='Event intensity')
+    axs[0].plot(time_array, memory_loss_intensities, color='red', label='Memory loss intensity')
+
+    # Plot average event and memory loss intensities
+    axs[0].axhline(np.mean(event_intensities), color='blue', linestyle='dotted', label='Average event intensity')
+    axs[0].axhline(np.mean(memory_loss_intensities), color='red', linestyle='dotted', label='Average memory loss intensity')
+
+    # Plot event times and memory loss times
+    for event_time in event_times:
+        axs[0].plot(event_time, mu + alpha * event_times.count(event_time), 'bx', alpha=0.5)
+    for memory_loss_time in memory_loss_times:
+        axs[0].plot(memory_loss_time, beta * memory_loss_times.count(memory_loss_time), 'ro', alpha=0.5)
+
+    axs[0].legend()
+
+    # Plot Q values
+    axs[1].plot(time_array, Q_values, color='purple', label='Q values')
+
+    # Plot average Q values
+    axs[1].axhline(np.mean(Q_values), color='purple', linestyle='dotted', label='Average Q value')
+
+    axs[1].legend()
+
     plt.show()
+ 
+def heston_queue_hawkes_osterlee(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact):
+    
+    """
+    Simulate asset prices and variance using the Heston model, incorporating event impacts from a Hawkes process with impact values drawn from two different normal distributions.
 
-# Call the function to create the plot
-plot_q_hawkes_process_osterlee()
+    q_hawkes_process: Generates a Hawkes process with queueing events and memory wipe events.
+    generate_impacts_from_events: Generates price and volatility impacts from the event times.
+
+    Parameters:
+    - S0: initial asset price
+    - v0: initial variance
+    - rho: correlation between asset returns and variance
+    - kappa: rate of mean reversion in variance process
+    - theta: long-term mean of variance process
+    - sigma: volatility of volatility, degree of randomness in the variance process
+    - T: time of simulation in years
+    - num_steps: number of time steps
+    - num_sims: number of scenarios/simulations
+    - r: risk-free interest rate
+    - hawkes_mu: baseline intensity for Hawkes process
+    - hawkes_alpha: positive constant affecting the intensity of the excitation for Hawkes process
+    - hawkes_beta: positive constant affecting the decay rate of the excitation for Hawkes process
+    - mean_price_impact: mean of the normal distribution for price impacts
+    - std_price_impact: standard deviation of the normal distribution for price impacts
+    - mean_vol_impact: mean of the normal distribution for volatility impacts
+    - std_vol_impact: standard deviation of the normal distribution for volatility impacts
+
+    Returns:
+    - asset_price: numpy array of asset prices over time (shape: (num_steps+1, num_sims))
+    - asset_volatility: numpy array of variances over time (shape: (num_steps+1, num_sims))
+    - event_times: list of event times from the Hawkes process
+    - price_impacts: list of price impacts corresponding to event times
+    - volatility_impacts: list of volatility impacts corresponding to event times
+    - wipe_times: list of memory wipe event times
+
+    Steps:
+    1. Generate a Hawkes process with queueing events and memory wipe events.
+    2. Generate price and volatility impacts from the event times.
+    3. Initialize asset price and volatility arrays.
+    4. Simulate asset prices and volatility for each time step and scenario, incorporating event impacts when necessary.
+    """
+    # Step 1: Generate a Hawkes process with queueing events and memory wipe events.
+    qh_mu = 0.1
+    qh_alpha = 0.005
+    qh_beta = 0.5
+    qh_dt = 0.01
+    qh_T = T
+    event_times, stochastic_memory_loss_times, event_intensities, memory_loss_intensities, Q_values = q_hawkes_process_osterlee(qh_mu, qh_alpha, qh_beta, qh_T, qh_dt)
+
+    # Step 2: Generate price and volatility impacts from the event times.
+    price_impacts, volatility_impacts = generate_impacts_from_events(event_times, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
+
+    # Step 3: Initialize asset price and volatility arrays.
+    dt = T/num_steps
+    drift_term = [0,0]
+    covariance_matrix = np.array([[1,rho], [rho,1]])
+    
+    asset_price = np.full(shape=(num_steps+1,num_sims), fill_value=S0)
+    asset_volatility = np.full(shape=(num_steps+1,num_sims), fill_value=v0)
+    
+    Z = np.random.multivariate_normal(drift_term, covariance_matrix, (num_steps,num_sims))
+
+    current_event_index = 0
+    next_event_time = event_times[current_event_index] if event_times else None
+    
+    #4. Simulate asset prices and volatility for each time step and scenario, incorporating event impacts when necessary.
+    for i in tqdm(range(1, num_steps + 1), desc="Simulation progress", ncols=100):
+        current_time = i * dt
+
+        asset_price[i] = asset_price[i - 1] * np.exp((r - 0.5 * asset_volatility[i - 1]) * dt + np.sqrt(asset_volatility[i - 1] * dt) * Z[i - 1, :, 0])
+        asset_volatility[i] = np.maximum(asset_volatility[i - 1] + kappa * (theta - asset_volatility[i - 1]) * dt + sigma * np.sqrt(asset_volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
+
+        while next_event_time is not None and current_time >= next_event_time:
+            asset_price[i] *= price_impacts[current_event_index]
+            asset_volatility[i] *= volatility_impacts[current_event_index]
+            
+            current_event_index += 1
+            if current_event_index < len(event_times):
+                next_event_time = event_times[current_event_index]
+            else:
+                next_event_time = None
+
+    return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts, stochastic_memory_loss_times
 
 ################################################## HESTON QUEUE HAWKES OPTION
 
@@ -1689,9 +1717,6 @@ def illustrate_heston_hawkes_normal_mc():
     print("\n\n\n")
 
 
-
-
-
 def main():
     # Main: The main function that executes the program and calls the appropriate functions based on user input
     print("Choose test")
@@ -1707,6 +1732,7 @@ def main():
     print("10: illustrate_heston_hawkes_normal_mc(). Example run showing Heston Hawkes with normal distributed price and vol impacts")
     print("11: run_and_plot_q_hawkes(). Plots an example run of a Q-Hawkes process.")
     print("12: illustrate_heston_queue_hawkes_normal_mc() Makes one example run of a HQH process and plots price vs Volatility and events")
+    print("13: Makes one example run of the Q-Hawkes process (as implemented by Osterlee)")
     user_choice = int(input("\n------> Choose test: "))
 
     if user_choice==1:
@@ -1733,9 +1759,11 @@ def main():
         run_and_plot_q_hawkes()
     if user_choice==12:
         illustrate_heston_queue_hawkes_normal_mc()
+    if user_choice==13:
+        plot_q_hawkes_process_osterlee()
     else:
         print("Invalid input")
 
     print("\n\nEnd of main program.")
 
-#main()
+main()
