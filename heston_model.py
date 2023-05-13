@@ -4,6 +4,7 @@ import time
 from tqdm import tqdm  # pip install tqdm
 import pandas as pd
 from time import sleep as time_sleep
+import scipy.stats as stats
 
 def calculate_correlation(x, y):
     """
@@ -597,7 +598,7 @@ def heston_queue_hawkes_normal_mc(S0, v0, rho, kappa, theta, sigma, T, num_steps
     qh_lambda_param = 0.5
     qh_max_intensity = 1
     intensities, event_times, wipe_times = q_hawkes_process(qh_mu, qh_alpha, T, qh_dt, qh_lambda_param, qh_max_intensity)
-
+    
     # Step 2: Generate price and volatility impacts from the event times.
     price_impacts, volatility_impacts = generate_impacts_from_events(event_times, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
 
@@ -764,6 +765,9 @@ def illustrate_heston_queue_hawkes_normal_mc():
         print(f"{event_time:.2f}\t\t{(price_impact - 1) * 100:.2f}\t\t\t{(vol_impact - 1) * 100:.2f}")
 
     print("\n\n\n")
+
+#illustrate_heston_queue_hawkes_normal_mc()
+
 
 ################################################## QUEUE HAWKES Samuel 2.0
 
@@ -957,7 +961,7 @@ def plot_q_hawkes_process_osterlee():
 
     plt.show()
  
-def heston_queue_hawkes_osterlee(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, hawkes_mu, hawkes_alpha, hawkes_beta, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact):
+def heston_queue_hawkes_normal_osterlee(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact, event_times):
     
     """
     Simulate asset prices and variance using the Heston model, incorporating event impacts from a Hawkes process with impact values drawn from two different normal distributions.
@@ -993,19 +997,12 @@ def heston_queue_hawkes_osterlee(S0, v0, rho, kappa, theta, sigma, T, num_steps,
     - wipe_times: list of memory wipe event times
 
     Steps:
-    1. Generate a Hawkes process with queueing events and memory wipe events.
-    2. Generate price and volatility impacts from the event times.
-    3. Initialize asset price and volatility arrays.
-    4. Simulate asset prices and volatility for each time step and scenario, incorporating event impacts when necessary.
+    1. Generate price and volatility impacts from the event times.
+    2. Initialize asset price and volatility arrays.
+    3. Simulate asset prices and volatility for each time step and scenario, incorporating event impacts when necessary.
     """
-    # Step 1: Generate a Hawkes process with queueing events and memory wipe events.
-    qh_mu = 0.1
-    qh_alpha = 0.005
-    qh_beta = 0.5
-    qh_dt = 0.01
-    qh_T = T
-    event_times, stochastic_memory_loss_times, event_intensities, memory_loss_intensities, Q_values = q_hawkes_process_osterlee(qh_mu, qh_alpha, qh_beta, qh_T, qh_dt)
 
+    
     # Step 2: Generate price and volatility impacts from the event times.
     price_impacts, volatility_impacts = generate_impacts_from_events(event_times, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
 
@@ -1039,7 +1036,130 @@ def heston_queue_hawkes_osterlee(S0, v0, rho, kappa, theta, sigma, T, num_steps,
             else:
                 next_event_time = None
 
-    return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts, stochastic_memory_loss_times
+    return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts
+
+def simulation_and_plot():
+    # Parameters for Q-Hawkes Process
+    mu = 1  # Baseline intensity for Hawkes process
+    alpha = 0.8  # Positive constant affecting the intensity of the excitation for Hawkes process
+    beta = 1.5  # Positive constant affecting the decay rate of the excitation for Hawkes process
+    T = 20  # Total runtime given in years
+    dt = T / 1000  # Time step length. Should evenly divide T
+
+    # Call Q-Hawkes process
+    event_times, memory_loss_times, event_intensities, memory_loss_intensities, Q_values = q_hawkes_process_osterlee(mu, alpha, beta, T, dt)
+
+    # Parameters for Heston model
+    S0 = 100.0  # Initial asset price
+    v0 = 0.25**2  # Initial variance
+    rho = 0.7  # Correlation between asset returns and variance
+    kappa = 3  # Rate of mean reversion in variance process
+    theta = 0.20**2  # Long-term mean of variance process
+    sigma = 0.6  # Volatility of volatility, degree of randomness in the variance process
+    num_steps = 1000  # Number of time steps
+    num_sims = 1  # Number of scenarios/simulations
+    r = 0.02  # Risk-free interest rate
+    mean_price_impact = 1.002  # Mean of the normal distribution for price impacts
+    std_price_impact = 0.05  # Standard deviation of the normal distribution for price impacts
+    mean_vol_impact = 1.002  # Mean of the normal distribution for volatility impacts
+    std_vol_impact = 0.05  # Standard deviation of the normal distribution for volatility impacts
+
+    # Run Heston model simulation
+    asset_price, asset_volatility, event_times, price_impacts, volatility_impacts = heston_queue_hawkes_normal_osterlee(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact, event_times)
+
+    # Create time array for plotting
+    time_array = np.linspace(0, T, num_steps+1)
+
+    fig, ax1 = plt.subplots(figsize=(14, 7))
+
+    # Plot asset price
+    color = 'tab:blue'
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Asset Price', color=color)
+    ax1.plot(time_array, asset_price, color=color, label='Asset Price')
+    ax1.tick_params(axis='y', labelcolor=color)
+    ax1.axhline(np.mean(asset_price), color=color, linestyle='dotted')
+
+    # Instantiate a second axes that shares the same x-axis
+    ax2 = ax1.twinx()
+    color = 'tab:red'
+
+    # We already handled the x-label with ax1
+    ax2.set_ylabel('Volatility', color=color)
+    ax2.plot(time_array, asset_volatility, color=color, label='Volatility')
+    ax2.tick_params(axis='y', labelcolor=color)
+    ax2.axhline(np.mean(asset_volatility), color=color, linestyle='dotted')
+
+    # Plot event times
+    ax1.scatter(event_times, np.interp(event_times, time_array, asset_price[:, 0]), color='purple', alpha=0.5, label='Event times')
+    ax2.scatter(event_times, np.interp(event_times, time_array, asset_volatility[:, 0]), color='purple', alpha=0.5)
+
+    # Add title and legend
+    fig.suptitle('Asset Price and Volatility Simulation with Q-Hawkes Process')
+    fig.legend(loc="upper left")
+
+    # Show plot
+    plt.show()
+
+def hqh_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact, mu, alpha, beta, dt, strike, option_type):
+    # Run the HQH simulation
+    event_times, memory_loss_times, event_intensities, memory_loss_intensities, Q_values = q_hawkes_process_osterlee(mu, alpha, beta, T, dt)
+    asset_price, asset_volatility, event_times, price_impacts, volatility_impacts = heston_queue_hawkes_normal_osterlee(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact, event_times)
+
+    # Calculate the terminal asset price
+    ST = asset_price[-1]
+
+    # Calculate the payoff for call and put options
+    if option_type == 'call':
+        payoff = max(ST - strike, 0)
+    elif option_type == 'put':
+        payoff = max(strike - ST, 0)
+    else:
+        raise ValueError("option_type must be 'call' or 'put'")
+
+    # Discount the payoff back to today
+    option_price = np.exp(-r * T) * payoff
+    return option_price
+
+def hqh_option_example():
+    # Fixed parameters for the HQH model
+    S0 = 100.0  # Initial asset price
+    v0 = 0.25**2  # Initial variance
+    rho = 0.7  # Correlation between asset returns and variance
+    kappa = 3  # Rate of mean reversion in variance process
+    theta = 0.20**2  # Long-term mean of variance process
+    sigma = 0.6  # Volatility of volatility, degree of randomness in the variance process
+    T = 1  # Option expiry time (in years)
+    num_steps = 1000  # Number of time steps
+    num_sims = 1  # Number of scenarios/simulations
+    r = 0.02  # Risk-free interest rate
+    mean_price_impact = 1.002  # Mean of the normal distribution for price impacts
+    std_price_impact = 0.05  # Standard deviation of the normal distribution for price impacts
+    mean_vol_impact = 1.002  # Mean of the normal distribution for volatility impacts
+    std_vol_impact = 0.05  # Standard deviation of the normal distribution for volatility impacts
+    mu = 1  # Baseline intensity for Hawkes process
+    alpha = 0.8  # Positive constant affecting the intensity of the excitation for Hawkes process
+    beta = 1.5  # Positive constant affecting the decay rate of the excitation for Hawkes process
+    dt = T / num_steps  # Time step length. Should evenly divide T
+
+    # Range of strike prices
+    strikes = np.linspace(80, 120, 50)
+
+    # Calculate the call option price for each strike price
+    call_prices = [hqh_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact, mu, alpha, beta, dt, strike, 'call') for strike in strikes]
+
+
+
+    # Plot the call option prices
+    plt.figure(figsize=(10, 6))
+    plt.plot(strikes, call_prices, label='Call Option Price')
+    plt.title('Call Option Price vs. Strike Price')
+    plt.xlabel('Strike Price')
+    plt.ylabel('Option Price')
+    plt.legend()
+    plt.show()
+
+hqh_option_example()
 
 ################################################## HESTON QUEUE HAWKES OPTION
 
@@ -1095,7 +1215,6 @@ def hqh_option(S0, K, r, T, option_type, num_simulations, num_steps=252,
     
     return option_price
 
-
 def hqh_option_illustration():
     # Declare example values for parameters
     S0 = 100
@@ -1134,7 +1253,6 @@ def hqh_option_illustration():
 
     plt.tight_layout()
     plt.show()
-
 
 #hqh_option_illustration()
 
@@ -1766,4 +1884,4 @@ def main():
 
     print("\n\nEnd of main program.")
 
-main()
+#main()
