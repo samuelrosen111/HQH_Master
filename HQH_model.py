@@ -53,6 +53,9 @@ def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
     - numpy array of asset prices over time (shape: (N+1, M))
     - numpy array of variances over time (shape: (N+1, M))
     """
+
+    check_if_parameters_are_okay = hqh_parameters_are_valid()
+
     # Calculate time increment
     dt = T/num_steps
     
@@ -72,7 +75,8 @@ def heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_
         asset_price[i] = asset_price[i - 1] * np.exp((r - 0.5 * volatility[i - 1]) * dt + np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 0])
         volatility[i] = np.maximum(volatility[i - 1] + kappa * (theta - volatility[i - 1]) * dt + sigma * np.sqrt(volatility[i - 1] * dt) * Z[i - 1, :, 1], 0)
 
-    return asset_price, volatility
+    return {"asset_prices": asset_price, "volatility": volatility, "params": {"S0": S0, "v0": v0, "rho": rho, "kappa": kappa, "theta": theta, "sigma": sigma, "T": T, "num_steps": num_steps, "num_sims": num_sims, "r": r}}
+    # return asset_price, volatility old, non-dynamic return
 
 def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, option_type, K): 
     # Heston_option: Calculates European option prices using the Heston model and Monte Carlo simulation
@@ -97,8 +101,9 @@ def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, o
     - The price of the option
     """    
     # Get the simulated asset prices and variances
-    stock_prices, variances = heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r)
-    
+    heston_model_results = heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r) #contains asset price, volatility and parameters
+    stock_prices = heston_model_results["asset_prices"] #In this funciton only price is of interest
+
     # Calculate the payoffs for the call or put option
     if option_type == 'call':
         payoffs = np.maximum(stock_prices[-1,:] - K, 0)
@@ -115,8 +120,8 @@ def heston_option(S0, v0, rho, kappa, theta, sigma, T, num_steps, num_sims, r, o
     
     return option_price
 
-def heston_parameters_are_valid(S0=None, v0=None, rho=None, kappa=None, theta=None, sigma=None, T=None, num_steps=None, num_sims=None, r=None):
-    # Error_handling: Validates Heston model parameters, detects errors, and prompts user to continue or retry with new input
+def hqh_parameters_are_valid(S0=None, v0=None, rho=None, kappa=None, theta=None, sigma=None, T=None, num_steps=None, num_sims=None, r=None):
+    # Error_handling: Validates all Heston-Queue-Hawkes model parameters, detects errors, and prompts user to continue or retry with new input
     errors = []
 
     if S0 is not None and S0 <= 0:
@@ -912,6 +917,9 @@ def q_hawkes_process_osterlee(mu, alpha, beta, T, dt):
             memory_loss_times.append(current_time)
         Q_values.append(Q)
 
+        if Q < 0: # Q can't go below zero
+            Q = 0
+
     return event_times, memory_loss_times, event_intensities, memory_loss_intensities, Q_values
 
 def plot_q_hawkes_process_osterlee():
@@ -1038,7 +1046,7 @@ def heston_queue_hawkes_normal_osterlee(S0, v0, rho, kappa, theta, sigma, T, num
 
     return asset_price, asset_volatility, event_times, price_impacts, volatility_impacts
 
-def simulation_and_plot():
+def simulation_and_plot_hqh_osterlee():
     # Parameters for Q-Hawkes Process
     mu = 1  # Baseline intensity for Hawkes process
     alpha = 0.8  # Positive constant affecting the intensity of the excitation for Hawkes process
@@ -1159,102 +1167,8 @@ def hqh_option_example():
     plt.legend()
     plt.show()
 
-hqh_option_example()
-
-################################################## HESTON QUEUE HAWKES OPTION
 
 
-def hqh_option(S0, K, r, T, option_type, num_simulations, num_steps=252,
-               rho=0.0, kappa=0.1, theta=0.2, sigma=0.5,
-               hawkes_mu=0.1, hawkes_alpha=0.005, hawkes_beta=0.5,
-               mean_price_impact=0.0, std_price_impact=1.0,
-               mean_vol_impact=0.0, std_vol_impact=1.0):
-    """
-    Estimates the price of a European call or put option using Monte Carlo simulation with the HQH model
-
-    Parameters:
-    S0 (float): the current stock price
-    K (float): the strike price
-    r (float): the risk-free interest rate
-    T (float): the time to maturity in years
-    option_type (str): either "call" or "put" to specify the type of option
-
-    num_simulations (int): the number of simulations to run
-    num_steps (int): the number of time steps to use in the simulation
-    rho (float): correlation between asset returns and variance in the HQH model
-    kappa (float): rate of mean reversion in variance process in the HQH model
-    theta (float): long-term mean of variance process in the HQH model
-    sigma (float): volatility of volatility, degree of randomness in the variance process in the HQH model
-    hawkes_mu (float): baseline intensity for Hawkes process in the HQH model
-    hawkes_alpha (float): positive constant affecting the intensity of the excitation for Hawkes process in the HQH model
-    hawkes_beta (float): positive constant affecting the decay rate of the excitation for Hawkes process in the HQH model
-    mean_price_impact (float): mean of the normal distribution for price impacts in the HQH model
-    std_price_impact (float): standard deviation of the normal distribution for price impacts in the HQH model
-    mean_vol_impact (float): mean of the normal distribution for volatility impacts in the HQH model
-    std_vol_impact (float): standard deviation of the normal distribution for volatility impacts in the HQH model
-
-    Returns:
-    float: the estimated price of the European call or put option
-    """
-    # Simulate the HQH model
-    asset_price, _, _, _, _, _ = heston_queue_hawkes_normal_mc(S0, theta, rho, kappa, theta, sigma, T, num_steps, num_simulations, r,
-                                                hawkes_mu, hawkes_alpha, hawkes_beta,
-                                                mean_price_impact, std_price_impact, mean_vol_impact, std_vol_impact)
-    
-        # Calculate the payoff for each scenario at maturity
-    if option_type == "call":
-        payoff = np.maximum(asset_price[-1] - K, 0)
-    elif option_type == "put":
-        payoff = np.maximum(K - asset_price[-1], 0)
-    else:
-        raise ValueError("Invalid option type, must be 'call' or 'put'")
-    
-    # Calculate the discounted expected payoff
-    discount_factor = math.exp(-r * T)
-    option_price = discount_factor * np.mean(payoff)
-    
-    return option_price
-
-def hqh_option_illustration():
-    # Declare example values for parameters
-    S0 = 100
-    r = 0.03
-    T = 1
-    num_simulations = 1000
-    num_steps = 252
-    option_type = "call"
-
-    # Generate an array of strike prices and time to maturity values
-    strike_prices = np.linspace(80, 120, 20)
-    times_to_maturity = np.linspace(0.1, 2, 20)
-
-    # Calculate option prices for different strike prices
-    option_prices_strike = [hqh_option(S0, K, r, T, option_type, num_simulations, num_steps) for K in strike_prices]
-
-    # Calculate option prices for different time to maturity values
-    option_prices_time = [hqh_option(S0, 100, r, t, option_type, num_simulations, num_steps) for t in times_to_maturity]
-
-    # Create the plots
-    plt.figure(figsize=(12, 5))
-
-    # Plot option prices for different strike prices
-    plt.subplot(1, 2, 1)
-    plt.plot(strike_prices, option_prices_strike)
-    plt.xlabel("Strike Price")
-    plt.ylabel("Option Price")
-    plt.title("HQH Option Prices for Different Strike Prices")
-
-    # Plot option prices for different time to maturity values
-    plt.subplot(1, 2, 2)
-    plt.plot(times_to_maturity, option_prices_time)
-    plt.xlabel("Time to Maturity (Years)")
-    plt.ylabel("Option Price")
-    plt.title("HQH Option Prices for Different Time to Maturity Values")
-
-    plt.tight_layout()
-    plt.show()
-
-#hqh_option_illustration()
 
 
 ################################################## Illustrative functions
@@ -1297,7 +1211,9 @@ def illustrate_heston():
     num_sims = int(input("Enter the number of simulations to run: "))
 
     # simulate asset prices and variances using the Heston model
-    simulated_stock_price, simulated_volatility = heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma,T, num_steps, num_sims, r)
+    heston_model_MonteCarlo_results = heston_model_MonteCarlo(S0, v0, rho, kappa, theta, sigma,T, num_steps, num_sims, r)
+    simulated_stock_price = heston_model_MonteCarlo_results["asset_prices"]
+    simulated_volatility = heston_model_MonteCarlo_results["volatility"]
     
     # plot asset prices and variances over time
     fig, (ax1, ax2)  = plt.subplots(1, 2, figsize=(12,5))
@@ -1851,6 +1767,7 @@ def main():
     print("11: run_and_plot_q_hawkes(). Plots an example run of a Q-Hawkes process.")
     print("12: illustrate_heston_queue_hawkes_normal_mc() Makes one example run of a HQH process and plots price vs Volatility and events")
     print("13: Makes one example run of the Q-Hawkes process (as implemented by Osterlee)")
+    print("14: Make an example run of the HQH method and plots price vs volatility")
     user_choice = int(input("\n------> Choose test: "))
 
     if user_choice==1:
@@ -1879,9 +1796,11 @@ def main():
         illustrate_heston_queue_hawkes_normal_mc()
     if user_choice==13:
         plot_q_hawkes_process_osterlee()
+    if user_choice==14:
+        simulation_and_plot_hqh_osterlee()
     else:
-        print("Invalid input")
+        print("Invalid input into the main program")
 
     print("\n\nEnd of main program.")
 
-#main()
+main()
